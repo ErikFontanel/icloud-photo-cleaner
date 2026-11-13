@@ -1,0 +1,125 @@
+/* Shared look for the Grid and the table. Dark by default; light for people who judge photos on a light ground.
+   An explicit choice sets data-theme on <html> (theme.js); without one the system setting decides. */
+:root {
+  --table: #1c1d1f;
+  --surface: #232528;
+  --panel: rgba(36, 38, 41, 0.92);
+  --line: #3a3d42;
+  --fg: #e9e6df;
+  --muted: #9a9890;
+  --accent: #5aa2ff;
+  --on-accent: #0d1b2e;
+  --delete: #ff6b5e;
+  --keep: #59c48a;
+  --event: #f2c46d;
+  --tile: #2b2d31;
+  --hover: #ffffff14;
+  --pressed: #ffffff24;
+  color-scheme: dark;
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --table: #e9e7e2;
+    --surface: #f6f5f2;
+    --panel: rgba(250, 249, 246, 0.92);
+    --line: #d3d0c9;
+    --fg: #1d1d1f;
+    --muted: #6c6a65;
+    --accent: #1f66d1;
+    --on-accent: #ffffff;
+    --delete: #d4412f;
+    --keep: #23824f;
+    --event: #9a6200;
+    --tile: #d9d6cf;
+    --hover: #0000000f;
+    --pressed: #0000001c;
+    color-scheme: light;
+  }
+}
+:root[data-theme="light"] {
+  --table: #e9e7e2;
+  --surface: #f6f5f2;
+  --panel: rgba(250, 249, 246, 0.92);
+  --line: #d3d0c9;
+  --fg: #1d1d1f;
+  --muted: #6c6a65;
+  --accent: #1f66d1;
+  --on-accent: #ffffff;
+  --delete: #d4412f;
+  --keep: #23824f;
+  --event: #9a6200;
+  --tile: #d9d6cf;
+  --hover: #0000000f;
+  --pressed: #0000001c;
+  color-scheme: light;
+}
+* {
+  box-sizing: border-box;
+}
+[hidden] {
+  display: none !important;
+}
+html,
+body {
+  background: var(--table);
+  color: var(--fg);
+  font:
+    13px / 1.4 -apple-system,
+    BlinkMacSystemFont,
+    "Inter",
+    system-ui,
+    sans-serif;
+}
+.bar {
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  backdrop-filter: blur(8px);
+}
+.bar button,
+.bar a {
+  font: inherit;
+  color: var(--fg);
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  padding: 5px 10px;
+  cursor: pointer;
+  text-decoration: none;
+}
+.bar button:hover,
+.bar a:hover {
+  background: var(--hover);
+}
+.bar button[aria-pressed="true"],
+.bar a[aria-current="page"] {
+  background: var(--pressed);
+}
+.bar button:disabled {
+  opacity: 0.4;
+  cursor: default;
+  background: transparent;
+}
+button.primary {
+  background: var(--accent);
+  color: var(--on-accent);
+  font-weight: 600;
+}
+button.primary:hover {
+  filter: brightness(1.1);
+}
+kbd {
+  font:
+    11px ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    monospace;
+  color: var(--muted);
+  margin-left: 4px;
+}
+.muted {
+  color: var(--muted);
+}
