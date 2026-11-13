@@ -9,6 +9,7 @@ export function PhotoTile({
   dim,
   badge,
   title,
+  albums,
   onToggle,
 }: {
   uuid: string;
@@ -16,6 +17,7 @@ export function PhotoTile({
   dim?: boolean;
   badge: string;
   title?: string;
+  albums?: string[];
   onToggle: () => void;
 }) {
   return (
@@ -30,6 +32,15 @@ export function PhotoTile({
       )}
     >
       <img src={`/preview/${uuid}`} loading="lazy" alt="" className={cn("mx-auto block h-full w-auto max-w-full object-contain", dim && "opacity-40")} />
+      {albums && albums.length > 0 && (
+        <div className="absolute inset-x-1.5 top-1.5 flex flex-wrap gap-1">
+          {albums.map((a) => (
+            <Badge key={a} variant="secondary" className="max-w-full truncate">
+              {a}
+            </Badge>
+          ))}
+        </div>
+      )}
       <Badge className={cn("absolute bottom-1.5 left-1.5 text-background", kept ? "bg-keep" : "bg-destructive")}>{badge}</Badge>
     </button>
   );

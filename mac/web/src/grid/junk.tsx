@@ -17,7 +17,7 @@ import { appliedText } from "@/lib/format";
 // Junk step: one page of up to 100 photos per group, worst first. Unclicked photos are marked junk; clicked ones are kept.
 const PAGE = 100;
 const ALL = "\u0000all"; // the "All" section filter; no section has this name
-type Item = { uuid: string; date: string; score: number; blur: number; section: string; cluster: number };
+type Item = { uuid: string; date: string; score: number; blur: number; section: string; cluster: number; albums: string[] };
 type Group = { key: string; label: string; items: Item[]; sections: { name: string; count: number }[] };
 type Data = { groups: Group[]; pending: number; album: string; runs: Run[] };
 
@@ -174,6 +174,7 @@ export function Junk(props: StepProps) {
                 kept={kept}
                 dim={kept}
                 badge={kept ? "keep" : "junk"}
+                albums={it.albums}
                 title={`${it.date.slice(0, 10)} · score ${it.score.toFixed(2)} · sharpness ${it.blur.toFixed(2)}`}
                 onToggle={() => {
                   const k = new Set(keep);

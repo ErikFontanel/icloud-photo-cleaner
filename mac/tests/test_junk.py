@@ -80,3 +80,13 @@ def test_similar_photos_sit_together(db):
     order = groups(db)["blurry"]
     tv = [order.index(u) for u in ("tv1", "tv2", "tv3")]
     assert max(tv) - min(tv) == 2  # the three TV photos are adjacent
+
+
+def test_items_carry_their_albums_without_to_delete(db):
+    from sift_mac.photos_app import TO_DELETE
+
+    add(db, "a", blur=0.1)
+    db.execute("update assets set albums=? where uuid='a'", (json.dumps(["Kyoto 2024", TO_DELETE]),))
+    add(db, "b", blur=0.2)
+    items = {i["uuid"]: i["albums"] for g in junk.candidates(db) for i in g["items"]}
+    assert items == {"a": ["Kyoto 2024"], "b": []}
