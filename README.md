@@ -1,3 +1,6 @@
+> [!NOTE]
+> run /setup to use
+
 # Sift
 
 Sift sorts your photo library one photo at a time. Swipe left to mark a photo for deletion, swipe right to keep it. Sift adds marked photos to the **Sift – To Delete** album in Photos. Sift never deletes photos: you delete them yourself from that album.
