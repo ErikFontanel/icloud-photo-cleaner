@@ -1,0 +1,32 @@
+# Quick checks that stop common agent mistakes. Bypass one run with LEFTHOOK=0 (only when the user says so).
+assert_lefthook_installed: true
+
+pre-commit:
+  parallel: true
+  commands:
+    no-delete:
+      run: scripts/no-delete.sh
+    no-private:
+      run: scripts/no-private.sh
+    biome:
+      glob: "mac/sift_mac/web/*.{js,css,html}"
+      run: ./node_modules/.bin/biome check --write --no-errors-on-unmatched {staged_files}
+      stage_fixed: true
+    ruff:
+      glob: "mac/**/*.py"
+      root: "mac/"
+      run: .venv/bin/ruff check --fix {staged_files} && .venv/bin/ruff format {staged_files}
+      stage_fixed: true
+    swift-format:
+      glob: "*.swift"
+      run: xcrun swift-format format -i {staged_files} && xcrun swift-format lint --strict {staged_files}
+      stage_fixed: true
+
+pre-push:
+  parallel: true
+  commands:
+    pytest:
+      root: "mac/"
+      run: uv run pytest -q -m "not photos"
+    ios-unit-tests:
+      run: scripts/test.sh -quiet -only-testing:SiftTests

@@ -1,0 +1,17 @@
+{
+  "$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
+  "vcs": { "enabled": true, "clientKind": "git", "useIgnoreFile": true },
+  "files": { "includes": ["mac/sift_mac/web/**"] },
+  "formatter": { "indentStyle": "space", "indentWidth": 2, "lineWidth": 160 },
+  "javascript": { "formatter": { "quoteStyle": "double" } },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "preset": "recommended",
+      "a11y": { "useButtonType": "off", "useSemanticElements": "off" },
+      "complexity": { "noCommaOperator": "off", "noImportantStyles": "off" },
+      "style": { "noDescendingSpecificity": "off" },
+      "suspicious": { "useIterableCallbackReturn": "off", "noAssignInExpressions": "off" }
+    }
+  }
+}
