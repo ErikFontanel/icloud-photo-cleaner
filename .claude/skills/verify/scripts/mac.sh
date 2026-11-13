@@ -20,6 +20,7 @@ start)
   [[ -f $geo/cities1000.txt ]] || { echo "error: no GeoNames data in $geo. Run once: cd mac && uv run sift-mac setup" >&2; exit 1; }
   mkdir -p "$RUN/home" "$OUT"
   ln -sfn "$geo" "$RUN/home/geonames"   # read-only place names, shared with the user's install
+  pnpm --dir "$ROOT/mac/web" build >/dev/null || { echo "error: the review page did not build; run pnpm install" >&2; exit 1; }
   cd "$ROOT/mac" && uv sync -q
   SIFT_HOME="$RUN/home" .venv/bin/sift-mac scan --library "$LIB"
   SIFT_HOME="$RUN/home" nohup .venv/bin/sift-mac review --port $PORT >"$RUN/log" 2>&1 &
