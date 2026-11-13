@@ -1,0 +1,71 @@
+name: Sift
+options:
+  bundleIdPrefix: ${SIFT_BUNDLE_ID_PREFIX}
+  deploymentTarget:
+    iOS: "26.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    SWIFT_DEFAULT_ACTOR_ISOLATION: MainActor
+    SWIFT_APPROACHABLE_CONCURRENCY: YES
+    ENABLE_USER_SCRIPT_SANDBOXING: NO
+    DEVELOPMENT_TEAM: "${SIFT_DEVELOPMENT_TEAM}"
+    CODE_SIGN_STYLE: Automatic
+targets:
+  Sift:
+    type: application
+    platform: iOS
+    sources:
+      - Sift
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: ${SIFT_BUNDLE_ID_PREFIX}.sift
+        MARKETING_VERSION: "1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        TARGETED_DEVICE_FAMILY: "1"
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: Sift
+        INFOPLIST_KEY_NSPhotoLibraryUsageDescription: Sift shows your photos one by one so you can sort them, and adds the ones you mark to a "Sift – To Delete" album. Sift never deletes anything.
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait
+        INFOPLIST_KEY_PHPhotoLibraryPreventAutomaticLimitedAccessAlert: YES
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+    preBuildScripts:
+      - name: Sift never deletes photos
+        basedOnDependencyAnalysis: false
+        script: "\"${SRCROOT}/scripts/no-delete.sh\""
+  SiftTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - SiftTests
+    dependencies:
+      - target: Sift
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: ${SIFT_BUNDLE_ID_PREFIX}.sift.tests
+  SiftUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - SiftUITests
+    dependencies:
+      - target: Sift
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: ${SIFT_BUNDLE_ID_PREFIX}.sift.uitests
+        TEST_TARGET_NAME: Sift
+        SWIFT_DEFAULT_ACTOR_ISOLATION: nonisolated
+schemes:
+  Sift:
+    build:
+      targets:
+        Sift: all
+    test:
+      targets:
+        - SiftTests
+        - SiftUITests

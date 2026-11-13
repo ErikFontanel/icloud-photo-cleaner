@@ -1,0 +1,14 @@
+build/
+*.xcodeproj/xcuserdata/
+*.xcodeproj/project.xcworkspace/xcuserdata/
+.DS_Store
+.claude/plans/*.progress.log
+mac/.venv/
+__pycache__/
+.pytest_cache/
+mac/helper/.build/
+.env
+Sift.xcodeproj/
+.claude/settings.local.json
+node_modules/
+.ruff_cache/
