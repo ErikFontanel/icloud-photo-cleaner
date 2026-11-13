@@ -1,9 +1,11 @@
 """Review page server. Binds to 127.0.0.1 only. Serves the page, a JSON API and local previews of scanned photos."""
 
 import json
+import sqlite3
 import subprocess
 import sys
 import threading
+from contextlib import contextmanager
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
@@ -24,6 +26,31 @@ STATIC = {
 
 
 SCAN = {"running": False, "result": "", "error": ""}  # the rescan started from the page
+OP = {"state": "idle"}  # the one scan, apply or undo running: idle, scanning, applying or undoing
+_op_lock = threading.Lock()
+RUNNING = {"scanning": "A scan is running", "applying": "An apply to Photos is running", "undoing": "An undo is running"}
+
+
+def claim(op: str) -> None:
+    """Takes the operation slot without waiting; while it is taken, another scan, apply or undo is refused (HTTP 409)."""
+    with _op_lock:
+        if OP["state"] != "idle":
+            raise RuntimeError(f"{RUNNING[OP['state']]}, try again when it finishes")
+        OP["state"] = op
+
+
+def release() -> None:
+    with _op_lock:
+        OP["state"] = "idle"
+
+
+@contextmanager
+def operation(op: str):
+    claim(op)
+    try:
+        yield
+    finally:
+        release()
 
 
 def _rescan() -> None:
@@ -34,6 +61,7 @@ def _rescan() -> None:
         SCAN.update(result=lines[-1] if lines else "", error=r.stderr.strip().splitlines()[-1] if r.returncode and r.stderr.strip() else "")
     finally:
         SCAN["running"] = False
+        release()
 
 
 def next_label(db) -> dict:
@@ -133,9 +161,9 @@ class Handler(BaseHTTPRequestHandler):
         try:
             body = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))) or "{}")
             if self.path == "/api/scan":
-                if not SCAN["running"]:
-                    SCAN.update(running=True, result="", error="")
-                    threading.Thread(target=_rescan, daemon=True).start()
+                claim("scanning")  # _rescan releases it when the scan ends
+                SCAN.update(running=True, result="", error="")
+                threading.Thread(target=_rescan, daemon=True).start()
                 self._json(SCAN)
             elif self.path == "/api/decide":
                 step = body.get("step", "junk")
@@ -180,16 +208,19 @@ class Handler(BaseHTTPRequestHandler):
             elif self.path == "/api/table/undo-edit":
                 self._json({"undone": edits.undo_edit(db), "pending": edits.pending(db)})
             elif self.path == "/api/table/apply":
-                self._json({"result": edits.apply_all(db), **edits.state(db)})
+                with operation("applying"):
+                    self._json({"result": edits.apply_all(db), **edits.state(db)})
             elif self.path == "/api/table/similar":
                 self._json({"uuids": table.similar(db, body["uuids"], int(body.get("n", 60)), body.get("exclude", []))})
             elif self.path == "/api/apply":
-                self._json(apply.apply_junk(db, step=body.get("step", "junk")))
+                with operation("applying"):
+                    self._json(apply.apply_junk(db, step=body.get("step", "junk")))
             elif self.path == "/api/undo":
-                self._json(apply.undo(db, int(body["run"])))
+                with operation("undoing"):
+                    self._json(apply.undo(db, int(body["run"])))
             else:
                 self._send(404, b"not found", "text/plain")
-        except (photos_app.WrongLibrary, ValueError, RuntimeError) as e:
+        except (photos_app.WrongLibrary, ValueError, RuntimeError, sqlite3.OperationalError) as e:  # OperationalError: database locked
             self._json({"error": str(e)}, 409)
         finally:
             db.close()

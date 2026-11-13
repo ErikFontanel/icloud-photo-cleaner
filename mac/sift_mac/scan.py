@@ -26,8 +26,9 @@ def _modified(photo) -> str:
 
 def scan(photos, db: sqlite3.Connection, analyse=vision.analyse) -> dict[str, int]:
     # Rows analysed before the classifier or face check existed count as 'new', so they get analysed once more.
+    # Skipped rows (no local preview) count as 'new' too: iCloud may have downloaded the preview since.
     known = {
-        uuid: (mod, "new" if status == "analysed" and (classes is None or faces is None) else status)
+        uuid: (mod, "new" if status == "skipped" or (status == "analysed" and (classes is None or faces is None)) else status)
         for uuid, mod, status, classes, faces in db.execute("select uuid, modified, status, classes, faces from assets")
     }
     no_camera = {u for (u,) in db.execute("select uuid from assets where camera is null")}  # rows from before the column

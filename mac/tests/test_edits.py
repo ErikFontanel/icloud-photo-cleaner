@@ -444,3 +444,13 @@ def test_apply_reports_progress_up_to_the_total_and_then_clears_it(db):
     assert seen and seen[0]["step"] == "Locations" and seen[0]["total"] == 5  # 3 album photos + 2 pins
     assert seen[0]["done"] == 3  # the album is done before the pins
     assert edits.PROGRESS == {"step": "", "done": 0, "total": 0}
+
+
+def test_deciding_again_on_an_applied_photo_keeps_its_run(db):
+    app = FakePhotos(PHOTOS)
+    apply.decide(db, "junk", "blurry", ["a1"], [])
+    run = apply.apply_junk(db, app)["run"]
+    apply.decide(db, "junk", "dark", ["a1"], [])  # the photo shows up in a second group
+    assert apply.pending(db, "junk") == [] and apply.apply_junk(db, app)["run"] is None
+    apply.undo(db, run, app)
+    assert app.album_members() == set() and db.execute("select count(*) from decisions").fetchone() == (0,)

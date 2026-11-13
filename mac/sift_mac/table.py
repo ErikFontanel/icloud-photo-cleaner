@@ -25,7 +25,7 @@ CLUSTER_SIZE = 150  # about this many photos per visual cluster
 VERSION = "3"  # bump when the manifest's shape changes, so cached ones are rebuilt
 
 _lock = threading.Lock()
-_state = {"key": None, "manifest": None, "done": 0, "total": 0, "error": None}
+_state = {"key": None, "manifest": None, "done": 0, "total": 0, "error": None, "build": 0}
 
 
 def _photos(db: sqlite3.Connection):
@@ -136,18 +136,24 @@ def _groups(db: sqlite3.Connection, uuids: list[str], X: np.ndarray, cluster: np
     return group, order, meta
 
 
-def _build(rows, key, db_path):
+def _set(build: int, **values) -> None:
+    with _lock:
+        if _state["build"] == build:  # a newer build started meanwhile: this one's results are stale
+            _state.update(values)
+
+
+def _build(rows, key, db_path, build):
     try:
         uuids = [r[0] for r in rows]
         chunks = [rows[i : i + PER_ATLAS] for i in range(0, len(rows), PER_ATLAS)]
         d = _dir()
         sizes = []
-        _state["total"] = len(rows)
+        _set(build, total=len(rows))
         with ProcessPoolExecutor() as pool:
             jobs = [(str(d / f"{key}-{i}.jpg"), [r[2] for r in c]) for i, c in enumerate(chunks)]
             for s in pool.map(_build_atlas, jobs):
                 sizes += s
-                _state["done"] = len(sizes)
+                _set(build, done=len(sizes))
         X = np.stack([np.frombuffer(r[4], np.float32) for r in rows])
         cluster, _ = _clusters(X)
         db = sqlite3.connect(db_path)  # this thread's own connection
@@ -174,9 +180,9 @@ def _build(rows, key, db_path):
             ],
         }
         (d / f"{key}.json").write_text(json.dumps(manifest))
-        _state["manifest"] = manifest
+        _set(build, manifest=manifest)
     except Exception as e:  # shown on the page instead of a stuck progress bar
-        _state["error"] = f"{type(e).__name__}: {e}"
+        _set(build, error=f"{type(e).__name__}: {e}")
 
 
 def manifest(db: sqlite3.Connection) -> dict:
@@ -185,16 +191,19 @@ def manifest(db: sqlite3.Connection) -> dict:
     key = hashlib.sha1((VERSION + "".join(uuids)).encode()).hexdigest()[:12]  # same key as from _photos' rows
     with _lock:
         if _state["key"] != key:
-            _state.update(key=key, manifest=None, done=0, total=len(uuids), error=None)
+            _state.update(key=key, manifest=None, done=0, total=len(uuids), error=None, build=_state["build"] + 1)
             cached = _dir() / f"{key}.json"
             if cached.exists():
                 _state["manifest"] = json.loads(cached.read_text())
             else:  # only a rebuild needs the feature prints
-                threading.Thread(target=_build, args=(_photos(db), key, config.state_db()), daemon=True).start()
+                threading.Thread(target=_build, args=(_photos(db), key, config.state_db(), _state["build"]), daemon=True).start()
         if _state["manifest"] and "looks" not in _state["manifest"]:  # named on load: labels can change without a rebuild
             _state["manifest"]["looks"] = look_names(db, _state["manifest"]["photos"])
-    if _state["error"]:
-        raise RuntimeError(_state["error"])
+        error = _state["error"]
+        if error:  # reported once; the next request builds again
+            _state.update(key=None, error=None)
+    if error:
+        raise RuntimeError(error)
     return _state["manifest"] or {"building": True, "done": _state["done"], "total": _state["total"]}
 
 

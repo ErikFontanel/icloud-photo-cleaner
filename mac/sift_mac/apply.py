@@ -9,7 +9,9 @@ from . import photos_app
 
 def decide(db: sqlite3.Connection, step: str, grp: str, accept: list[str], reject: list[str]) -> None:
     db.executemany(
-        "insert or replace into decisions (uuid, step, grp, choice) values (?, ?, ?, ?)",
+        # An applied decision (run_id set) stays as it is, so the photo isn't sent again and undo of its run still finds it.
+        """insert into decisions (uuid, step, grp, choice) values (?, ?, ?, ?)
+           on conflict(uuid, step) do update set grp=excluded.grp, choice=excluded.choice where decisions.run_id is null""",
         [(u, step, grp, "accept") for u in accept] + [(u, step, grp, "reject") for u in reject],
     )
     db.commit()

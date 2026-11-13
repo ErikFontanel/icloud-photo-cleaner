@@ -123,3 +123,10 @@ def test_camera_is_stored_and_backfilled(db, fixture_dir):
     db.execute("update assets set camera=null")  # a row from before the camera column
     counts = scan([fake("a", fixture_dir / "event_0.jpg")], db)
     assert counts["unchanged"] == 1 and db.execute("select camera from assets").fetchone() == ("Canon Canon PowerShot G9 X",)
+
+
+def test_a_skipped_photo_is_analysed_once_its_preview_is_local(db, fixture_dir):
+    scan([fake("b", None)], db)
+    counts = scan([fake("b", fixture_dir / "event_0.jpg")], db)  # same modification date: iCloud only downloaded the preview
+    assert counts["analysed"] == 1
+    assert db.execute("select status from assets where uuid='b'").fetchone() == ("analysed",)
