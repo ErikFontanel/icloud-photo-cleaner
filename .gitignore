@@ -13,3 +13,4 @@ Sift.xcodeproj/
 node_modules/
 mac/sift_mac/web/
 .ruff_cache/
+.claude/worktrees/
