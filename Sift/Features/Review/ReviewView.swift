@@ -10,37 +10,36 @@ struct ReviewView: View {
     @Environment(\.undoManager) private var undoManager
     @Environment(\.displayScale) private var scale
 
-    @State private var currentID: String?
-    @State private var didStart = false
+    @State private var session = ReviewSession()
     @State private var entryOffset: CGFloat = 0
     @State private var departures: [Departure] = []
     @State private var dragProgress: CGFloat = 0
-    @State private var showDone = false
     @State private var commitCount = 0
     @State private var undoCount = 0
     @State private var canUndo = false
     @State private var cardSize: CGSize = .zero
 
     private var ids: [String] { library.index.ids(in: month) }
-    private var currentIndex: Int? { currentID.flatMap { ids.firstIndex(of: $0) } }
+    private var currentIndex: Int? { session.index(in: ids) }
     private var progress: MonthProgress { store.progress(for: ids) }
+    private var showDone: Bool { session.mode == .summary }
 
     var body: some View {
         VStack(spacing: 12) {
             GeometryReader { proxy in
                 let size = CGSize(width: proxy.size.width - 32, height: proxy.size.height)
                 ZStack {
-                    if let currentID {
-                        cardStack(currentID: currentID, size: size)
-                    } else if !showDone {
-                        sortedState
+                    switch session.mode {
+                    case .reviewing(let id): cardStack(currentID: id, size: size)
+                    case .sorted: sortedState
+                    case .summary: EmptyView()
                     }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .onAppear { cardSize = size }
                 .onChange(of: size) { _, new in cardSize = new }
             }
-            Filmstrip(ids: ids, currentID: currentID) { id in jump(to: id) }
+            Filmstrip(ids: ids, currentID: session.currentID) { id in jump(to: id) }
                 .frame(height: 52)
                 // Nothing of the review screen may show around or through the summary sheet.
                 .opacity(showDone ? 0 : 1)
@@ -61,9 +60,9 @@ struct ReviewView: View {
         }
         .sensoryFeedback(.impact(weight: .medium), trigger: commitCount)
         .sensoryFeedback(.impact(flexibility: .soft), trigger: undoCount)
-        .sheet(isPresented: $showDone) {
+        .sheet(isPresented: summaryShown) {
             MonthDoneSheet(month: month, progress: progress, ids: ids, nextMonth: nextMonth) { next in
-                showDone = false
+                session.dismissSummary(ids: ids, isDecided: isDecided)
                 onNextMonth(next)
             }
         }
@@ -72,7 +71,10 @@ struct ReviewView: View {
             guard let event else { return }
             returnFromUndo(event)
         }
-        .onChange(of: currentID) { prefetch() }
+        .onChange(of: session.currentID) { prefetch() }
+        // Photos added or removed, or verdicts cleared by a reconcile or a failed album change.
+        .onChange(of: ids) { session.libraryChanged(ids: ids, isDecided: isDecided) }
+        .onChange(of: progress) { session.libraryChanged(ids: ids, isDecided: isDecided) }
         .onReceive(undoChanges) { _ in
             canUndo = undoManager?.canUndo ?? false
         }
@@ -93,6 +95,10 @@ struct ReviewView: View {
         )
         .receive(on: RunLoop.main)
         .eraseToAnyPublisher()
+    }
+
+    private var summaryShown: Binding<Bool> {
+        Binding(get: { showDone }, set: { if !$0 { session.dismissSummary(ids: ids, isDecided: isDecided) } })
     }
 
     private var albumErrorShown: Binding<Bool> {
@@ -138,7 +144,7 @@ struct ReviewView: View {
                 Button("Next Month: \(nextMonth.title)") { onNextMonth(nextMonth) }
                     .buttonStyle(.glassProminent)
             }
-            Button("Review Again from the Start") { jump(to: ids.first) }
+            Button("Review Again from the Start") { if let first = ids.first { jump(to: first) } }
         }
     }
 
@@ -152,18 +158,18 @@ struct ReviewView: View {
         }
         ToolbarItem(placement: .bottomBar) {
             Button("Previous", systemImage: "chevron.backward") { step(by: -1) }
-                .disabled((currentIndex ?? ids.count) == 0)
+                .disabled((currentIndex ?? 0) == 0)
         }
         ToolbarSpacer(.flexible, placement: .bottomBar)
         ToolbarItemGroup(placement: .bottomBar) {
             Button("Delete", systemImage: "trash") { decideFromButton(.delete) }
                 .tint(.red)
                 .scaleEffect(1 + 0.15 * max(0, -dragProgress))
-                .disabled(currentID == nil)
+                .disabled(currentIndex == nil)
             Button("Keep", systemImage: "checkmark") { decideFromButton(.keep) }
                 .tint(.green)
                 .scaleEffect(1 + 0.15 * max(0, dragProgress))
-                .disabled(currentID == nil)
+                .disabled(currentIndex == nil)
         }
         ToolbarSpacer(.flexible, placement: .bottomBar)
         ToolbarItem(placement: .bottomBar) {
@@ -183,10 +189,10 @@ struct ReviewView: View {
 
     // MARK: Actions
 
+    private func isDecided(_ id: String) -> Bool { store.verdict(for: id) != nil }
+
     private func start() {
-        guard !didStart else { return }
-        didStart = true
-        currentID = ids.first { store.verdict(for: $0) == nil } ?? ids.first
+        session.start(ids: ids, isDecided: isDecided)
         canUndo = undoManager?.canUndo ?? false
     }
 
@@ -195,65 +201,49 @@ struct ReviewView: View {
     }
 
     private func decide(_ verdict: Verdict, pose: CardPose) {
-        guard let id = currentID, let index = currentIndex else { return }
+        guard let id = session.currentID, currentIndex != nil else { return }
         let wasComplete = progress.isComplete
         store.set(verdict, for: id, undoManager: undoManager)
         departures.append(Departure(assetID: id, verdict: verdict, pose: pose, direction: verdict == .delete ? -1 : 1))
         commitCount += 1
         dragProgress = 0
         entryOffset = 0
-
-        if !wasComplete, progress.isComplete {
-            // Only the decision that finishes the month shows the summary; changing sorted photos later does not.
-            currentID = nil
-            showDone = true
-        } else if index + 1 < ids.count {
-            currentID = ids[index + 1]
-        } else if wasComplete {
-            currentID = nil
-        } else {
-            // End of the month with gaps left: go to the first undecided photo.
-            currentID = ids.first { store.verdict(for: $0) == nil }
-        }
+        session.decide(ids: ids, wasComplete: wasComplete, isDecided: isDecided)
     }
 
     /// Previous and next move through photos without deciding.
     private func step(by delta: Int) {
-        guard let index = currentIndex, let id = currentID else { return }
-        let target = index + delta
-        guard ids.indices.contains(target) else { return }
+        guard let id = session.currentID, session.step(by: delta, ids: ids) else { return }
         departures.append(Departure(assetID: id, verdict: nil, pose: CardPose(), direction: delta > 0 ? -1 : 1))
         entryOffset = delta > 0 ? cardSize.width * SwipePhysics.flyOffFraction : -cardSize.width * SwipePhysics.flyOffFraction
         dragProgress = 0
-        currentID = ids[target]
     }
 
-    private func jump(to id: String?) {
-        guard let id, id != currentID else { return }
+    private func jump(to id: String) {
         let from = currentIndex ?? 0
-        let to = ids.firstIndex(of: id) ?? 0
-        if let current = currentID {
+        let current = session.currentID
+        guard session.jump(to: id, ids: ids) else { return }
+        let to = currentIndex ?? 0
+        if let current {
             departures.append(Departure(assetID: current, verdict: nil, pose: CardPose(), direction: to >= from ? -1 : 1))
         }
         entryOffset = (to >= from ? 1 : -1) * cardSize.width * SwipePhysics.flyOffFraction
         dragProgress = 0
-        currentID = id
     }
 
     /// The undone card comes back from the side it left.
     private func returnFromUndo(_ event: DecisionStore.UndoEvent) {
-        guard ids.contains(event.assetID) else { return }
+        let current = session.currentID
+        guard session.returnFromUndo(event.assetID, undone: event.undone, ids: ids, isDecided: isDecided) else { return }
         undoCount += 1
         departures.removeAll { $0.assetID == event.assetID }
         let side: CGFloat = event.undone == .delete ? -1 : 1
         // The card that was on top makes way, leaving on the other side.
-        if let current = currentID, current != event.assetID {
+        if let current, current != event.assetID {
             departures.append(Departure(assetID: current, verdict: nil, pose: CardPose(), direction: -side))
         }
         entryOffset = side * cardSize.width * SwipePhysics.flyOffFraction
         dragProgress = 0
-        showDone = false
-        currentID = event.assetID
     }
 
     private func prefetch() {

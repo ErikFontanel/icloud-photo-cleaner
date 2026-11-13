@@ -130,10 +130,15 @@ final class DecisionStore {
         verdicts[id] = verdict
         persist(verdict, for: id)
         guard syncAlbum else { return }
+        // If Photos refuses, put the verdict back so it never claims an album state that isn't true.
+        let rollback = { [self] in
+            guard verdicts[id] == verdict else { return }
+            apply(previous, for: id, previous: verdict, syncAlbum: false)
+        }
         if verdict == .delete, previous != .delete {
-            enqueue { try await self.album.add([id]) }
+            enqueue(rollback: rollback) { try await self.album.add([id]) }
         } else if previous == .delete, verdict != .delete {
-            enqueue { try await self.album.remove([id]) }
+            enqueue(rollback: rollback) { try await self.album.remove([id]) }
         }
     }
 
@@ -152,14 +157,15 @@ final class DecisionStore {
     }
 
     /// Album changes run one at a time, in order, so a quick undo never races its own swipe.
-    private func enqueue(_ operation: @escaping () async throws -> Void) {
+    /// An error stays until the user dismisses it with `clearAlbumError`.
+    private func enqueue(rollback: (() -> Void)? = nil, _ operation: @escaping () async throws -> Void) {
         let previous = albumQueue
         albumQueue = Task {
             await previous?.value
             do {
                 try await operation()
-                albumError = nil
             } catch {
+                rollback?()
                 albumError = "Couldn't update the \(DeletionAlbumTitle.value) album. \(error.localizedDescription)"
             }
         }

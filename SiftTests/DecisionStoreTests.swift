@@ -4,16 +4,28 @@ import Testing
 
 @testable import Sift
 
+struct AlbumFailure: Error {}
+
 final class FakeAlbum: DeletionAlbumSyncing {
     private(set) var members: Set<String> = []
     private(set) var log: [String] = []
+    /// The next this many adds or removes throw without changing the album.
+    var failures = 0
 
     func add(_ ids: [String]) async throws {
+        if failures > 0 {
+            failures -= 1
+            throw AlbumFailure()
+        }
         members.formUnion(ids)
         log.append("add \(ids.sorted().joined(separator: ","))")
     }
 
     func remove(_ ids: [String]) async throws {
+        if failures > 0 {
+            failures -= 1
+            throw AlbumFailure()
+        }
         members.subtract(ids)
         log.append("remove \(ids.sorted().joined(separator: ","))")
     }
@@ -124,6 +136,50 @@ struct DecisionStoreTests {
         await store.flushAlbum()
         #expect(album.log.last == "add a")
         #expect(store.verdict(for: "a") == .delete)
+    }
+
+    @Test func failedAddRollsTheVerdictBack() async {
+        let store = makeStore()
+        action { store.set(.keep, for: "a", undoManager: undo) }
+        album.failures = 1
+        action { store.set(.delete, for: "a", undoManager: undo) }
+        await store.flushAlbum()
+        #expect(store.verdict(for: "a") == .keep)
+        #expect(album.members.isEmpty)
+        #expect(store.albumError != nil)
+        #expect(makeStore().verdict(for: "a") == .keep, "The rollback should be saved too")
+    }
+
+    @Test func failedRemoveRollsTheVerdictBack() async {
+        let store = makeStore()
+        action { store.set(.delete, for: "a", undoManager: undo) }
+        await store.flushAlbum()
+        album.failures = 1
+        action { store.set(nil, for: "a", undoManager: undo) }
+        await store.flushAlbum()
+        #expect(store.verdict(for: "a") == .delete)
+        #expect(album.members == ["a"])
+    }
+
+    @Test func rollbackLeavesALaterVerdictAlone() async {
+        let store = makeStore()
+        album.failures = 1
+        action { store.set(.delete, for: "a", undoManager: undo) }
+        action { store.set(.keep, for: "a", undoManager: undo) }
+        await store.flushAlbum()
+        #expect(store.verdict(for: "a") == .keep)
+    }
+
+    @Test func albumErrorStaysUntilDismissed() async {
+        let store = makeStore()
+        album.failures = 1
+        action { store.set(.delete, for: "a", undoManager: undo) }
+        await store.flushAlbum()
+        action { store.set(.delete, for: "b", undoManager: undo) }
+        await store.flushAlbum()
+        #expect(store.albumError != nil, "A later success must not hide the error")
+        store.clearAlbumError()
+        #expect(store.albumError == nil)
     }
 
     @Test func percentNeverRoundsUpTo100() {
