@@ -1,3 +1,4 @@
+import { CircleCheckIcon } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { ActionButton } from "@/components/action-button";
@@ -7,7 +8,7 @@ import { PhotoTile } from "@/components/photo-tile";
 import { RescanButton } from "@/components/rescan-button";
 import { RunsList } from "@/components/runs-list";
 import { Button } from "@/components/ui/button";
-import { Empty, EmptyContent, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
+import { Empty, EmptyContent, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { Kbd } from "@/components/ui/kbd";
 import type { StepProps } from "@/grid/app";
 import { StepLayout } from "@/grid/step-layout";
@@ -114,6 +115,9 @@ function Review({ data, load }: { data: Sets; load: () => Promise<void> }) {
       ) : (
         <Empty className="my-6 border">
           <EmptyHeader>
+            <EmptyMedia variant="icon" className="text-keep">
+              <CircleCheckIcon />
+            </EmptyMedia>
             <EmptyTitle>No sets left in this tier</EmptyTitle>
           </EmptyHeader>
           <EmptyContent>
@@ -123,7 +127,7 @@ function Review({ data, load }: { data: Sets; load: () => Promise<void> }) {
       )}
       <div className="flex flex-wrap gap-2">
         {sets.flatMap((s) => [
-          <div key={`h${s.best}`} className="basis-full border-t pt-1 text-xs text-muted-foreground">
+          <div key={`h${s.best}`} className="basis-full pt-4 text-xs font-medium text-muted-foreground first:pt-0">
             {minute(s.date)} · {s.uuids.length} photos
           </div>,
           ...s.uuids.map((u) => {
@@ -198,7 +202,7 @@ function Label() {
   if (!state) return null;
   return (
     <div className="mt-3 grid gap-3">
-      <p className="text-xs text-muted-foreground">
+      <p className="text-xs text-pretty text-muted-foreground">
         {pair
           ? `Pair ${state.done + 1} of ${state.total}. Would you keep only one of these two? Duplicate means a near-copy, burst frame or retake where the best one is enough. Same event alone is not a duplicate.`
           : `All ${state.total} pairs labelled.`}
@@ -207,7 +211,7 @@ function Label() {
         <div className="flex flex-wrap gap-3">
           {[pair.a, pair.b].map((u) => (
             <figure key={u} className="m-0 flex h-[62vh] min-w-0 flex-[1_1_360px] items-center justify-center overflow-hidden rounded-md bg-tile">
-              <img src={`/preview/${u}`} alt="" className="block max-h-full max-w-full object-contain" />
+              <img src={`/preview/${u}`} alt="" className="sift-photo block max-h-full max-w-full object-contain" />
             </figure>
           ))}
         </div>

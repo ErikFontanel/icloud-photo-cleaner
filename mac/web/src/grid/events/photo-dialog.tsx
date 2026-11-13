@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/compone
 import { type Focus, useEvents } from "@/grid/events/context";
 import { type Pile, when } from "@/grid/events/model";
 import type { Spot } from "@/lib/api";
-import { fade, fit, flip, flyBack, slideIn } from "@/lib/motion";
+import { fade, fit, flip, flyBack, follow, slideIn } from "@/lib/motion";
 
 // A photo large, one at a time, with its own place, tags, albums and Delete: a photo from a strip (← → step through
 // its event), or the selection pile (← → step through the pile). Esc or a click outside closes it. It flies out of its
@@ -37,6 +37,7 @@ export function PhotoDialog({ focus, setFocus, spotsOf }: { focus: Focus | null;
   const takeOff = () => {
     if (!big.current || !openFrom.current) return;
     flip(big.current, openFrom.current);
+    follow(big.current.parentElement?.querySelector("aside"), matchMedia("(min-width: 768px)").matches ? "16px 0" : "0 16px"); // beside the photo, or below it
     fade(document.querySelector("[data-slot=dialog-overlay]"), true);
     openFrom.current = undefined;
   };
@@ -106,9 +107,9 @@ export function PhotoDialog({ focus, setFocus, spotsOf }: { focus: Focus | null;
           onLoad={(e) => setShape({ u, aspect: e.currentTarget.naturalWidth / e.currentTarget.naturalHeight })}
           alt=""
           style={size}
-          className="block max-w-none shrink-0 rounded-xl bg-tile object-contain shadow-2xl" // sized by fit(), not by the dialog
+          className="sift-photo block max-w-none shrink-0 rounded-xl bg-tile object-contain shadow-2xl" // sized by fit(), not by the dialog
         />
-        <aside className="grid max-h-[84vh] w-[min(320px,calc(100vw-2rem))] shrink-0 content-start gap-3 overflow-auto rounded-xl border bg-card p-4">
+        <aside className="grid max-h-[84vh] w-[min(320px,calc(100vw-2rem))] shrink-0 content-start gap-3 overflow-auto overscroll-contain rounded-xl border bg-card p-4 shadow-xl">
           <div>
             <DialogTitle asChild>{p ? <EventTitle name={p.name} label={p.label} /> : <div>Photo</div>}</DialogTitle>
             <DialogDescription>{p && when(p)}</DialogDescription>

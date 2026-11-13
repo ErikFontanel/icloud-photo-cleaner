@@ -64,11 +64,11 @@ function ApplyProgress() {
     };
   }, []);
   return (
-    <div className="flex min-w-0 flex-1 items-center justify-end gap-3" role="status">
+    <div className="sift-pop flex min-w-0 flex-1 items-center justify-end gap-3 [--from:0_0]" role="status">
       <span className="truncate text-xs text-muted-foreground">
         {p.total ? `${p.step} · ${p.done?.toLocaleString()} of ${p.total.toLocaleString()} photos` : `${p.step || "Writing to Photos"}…`}
       </span>
-      <Progress className="w-56" value={p.total ? ((p.done || 0) / p.total) * 100 : 0} />
+      <Progress key={p.step} className="w-56" value={p.total ? ((p.done || 0) / p.total) * 100 : 0} />
     </div>
   );
 }

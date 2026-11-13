@@ -24,7 +24,7 @@ export function App() {
       <View key={step} step={step} onStep={go} />
       <footer className="mt-8 text-xs text-muted-foreground">
         Place names:{" "}
-        <a className="underline" href="https://www.geonames.org/">
+        <a className="underline underline-offset-2 hover:text-foreground" href="https://www.geonames.org/">
           GeoNames
         </a>
         , CC BY 4.0.

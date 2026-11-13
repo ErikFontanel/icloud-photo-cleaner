@@ -12,7 +12,12 @@ try {
 const listeners = new Set<() => void>();
 const current = (): "light" | "dark" => (chosen === "light" || chosen === "dark" ? chosen : system.matches ? "light" : "dark");
 function apply() {
-  document.documentElement.classList.toggle("dark", current() === "dark");
+  // Every colour transition would fire at once and smear the switch: hold them off until the new ground is painted.
+  const root = document.documentElement;
+  root.classList.add("sift-no-transitions");
+  root.classList.toggle("dark", current() === "dark");
+  void document.body?.offsetHeight; // flush style for the whole page while transitions are off
+  requestAnimationFrame(() => requestAnimationFrame(() => root.classList.remove("sift-no-transitions"))); // after the paint
   for (const l of listeners) l();
   dispatchEvent(new Event("themechange")); // the table redraws its ground
 }

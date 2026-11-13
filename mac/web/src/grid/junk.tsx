@@ -1,3 +1,4 @@
+import { CircleCheckIcon } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { ActionButton } from "@/components/action-button";
@@ -8,7 +9,7 @@ import { PhotoTile } from "@/components/photo-tile";
 import { RescanButton } from "@/components/rescan-button";
 import { RunsList } from "@/components/runs-list";
 import { Button } from "@/components/ui/button";
-import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
+import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import type { StepProps } from "@/grid/app";
 import { StepLayout } from "@/grid/step-layout";
 import { type ApplyResult, api, type Run } from "@/lib/api";
@@ -150,6 +151,9 @@ export function Junk(props: StepProps) {
       ) : (
         <Empty className="my-6 border">
           <EmptyHeader>
+            <EmptyMedia variant="icon" className="text-keep">
+              <CircleCheckIcon />
+            </EmptyMedia>
             <EmptyTitle>Every photo in this group is reviewed</EmptyTitle>
             <EmptyDescription>Build events and albums on the table: Pile or Events above.</EmptyDescription>
           </EmptyHeader>
@@ -161,7 +165,7 @@ export function Junk(props: StepProps) {
       <div className="flex flex-wrap gap-2">
         {runs.flatMap((run) => [
           runs.length > 1 && (
-            <div key={`b${run[0].uuid}`} className="basis-full border-t pt-1 text-xs text-muted-foreground">
+            <div key={`b${run[0].uuid}`} className="basis-full pt-4 text-xs font-medium text-muted-foreground first:pt-0">
               {run.length} similar
             </div>
           ),

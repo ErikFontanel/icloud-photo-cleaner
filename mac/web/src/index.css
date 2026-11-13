@@ -80,6 +80,9 @@
   --color-event: var(--event);
   --color-tile: var(--tile);
   --font-sans: -apple-system, BlinkMacSystemFont, "Inter", system-ui, sans-serif;
+  /* Strong ease-out for UI transitions; also what Tailwind's ease-out utility means here. The photo flights in
+     lib/motion.ts use Apple's curve (EASE) instead, on purpose: longer travel wants a softer landing. */
+  --ease-out: cubic-bezier(0.2, 0, 0, 1);
 }
 
 @layer base {
@@ -87,6 +90,135 @@
     @apply border-border outline-ring/50;
   }
   body {
-    @apply bg-background text-foreground font-sans antialiased;
+    /* Counts are most of the numbers here; fixed-width digits keep them from shifting as they change. */
+    @apply bg-background text-foreground font-sans antialiased tabular-nums;
   }
+}
+
+/* Unlayered on purpose, to beat shadcn's transition-all without editing components/ui. Unlayered beats every
+   Tailwind utility, so transition-*, duration-* and ease-* classes on these elements do nothing: change it here. */
+
+/* Press: anything you click sinks a little on pointer-down, so the page answers before the click lands. */
+:where(
+  [data-slot="button"],
+  [data-slot="toggle"],
+  [data-slot="toggle-group-item"],
+  [data-slot="alert-dialog-action"],
+  [data-slot="alert-dialog-cancel"],
+  [data-press]
+) {
+  transition-property: color, background-color, border-color, box-shadow, opacity, scale, translate;
+  transition-duration: 150ms;
+  transition-timing-function: var(--ease-out);
+  @media (prefers-reduced-motion: no-preference) {
+    &:where(:not(:disabled, [aria-disabled="true"])):active {
+      scale: var(--press, 0.96);
+    }
+  }
+}
+/* Photo tiles and the tray move less: 0.96 of a 320px tile is a lurch, not a press. */
+[data-press] {
+  --press: 0.98;
+}
+/* Segments of a group share their borders: a shrinking segment would open the seams. They answer with colour only. */
+[data-slot="button-group"] > * {
+  --press: 1;
+}
+
+/* Apply progress glides instead of jumping once a second (each phase remounts the bar, so it never glides back). */
+@media (prefers-reduced-motion: no-preference) {
+  [data-slot="progress-indicator"] {
+    transition: transform 600ms var(--ease-out);
+  }
+}
+
+/* The Grid's header: a translucent material the photos scroll under. At the top it is just the page; once something
+   is under it, it gains blur and an edge. (The saturate boost would tint the bare page, so it waits too.) */
+.sift-bar-sticky {
+  container: sift-bar / scroll-state;
+}
+.sift-bar {
+  background: color-mix(in oklab, var(--background) 72%, transparent);
+  border-block-end: 1px solid transparent; /* forced colors drop shadows; this keeps an edge */
+  transition: box-shadow 200ms var(--ease-out);
+}
+@container sift-bar scroll-state(stuck: top) {
+  .sift-bar {
+    backdrop-filter: blur(20px) saturate(1.8);
+    box-shadow:
+      0 1px 0 var(--border),
+      0 8px 24px -12px rgb(0 0 0 / 0.18);
+  }
+}
+/* Without stuck detection (Safari, Firefox) the bar is always on: near-solid instead of a blur on every scroll frame. */
+@supports not (container-type: scroll-state) {
+  .sift-bar {
+    background: color-mix(in oklab, var(--background) 94%, transparent);
+    box-shadow: 0 1px 0 var(--border);
+  }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .sift-bar {
+    background: var(--background);
+    backdrop-filter: none;
+  }
+}
+
+/* Entrances, once per mount: small panels that appear on demand (key help, the table's selection) fade in quickly
+   from the side they sit on (--from); a view's first content (.sift-enter) rises in slower. Reduced motion: fade only. */
+.sift-pop,
+.sift-enter {
+  transition:
+    opacity var(--dur, 150ms) var(--ease-out),
+    translate var(--dur, 150ms) var(--ease-out);
+  @starting-style {
+    opacity: 0;
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    @starting-style {
+      translate: var(--from, 0 6px);
+    }
+  }
+}
+.sift-enter {
+  --dur: 300ms;
+  --from: 0 8px;
+}
+
+/* Photos get a hairline in pure black or white, so a light sky never melts into the light ground. */
+.sift-photo {
+  outline: 1px solid oklch(0 0 0 / 0.1);
+  outline-offset: -1px;
+}
+.dark .sift-photo {
+  outline-color: oklch(1 0 0 / 0.1);
+}
+
+/* A contextual icon swap (sun and moon): the new icon resolves out of a blur. A keyframe, because the theme switch
+   holds transitions off for exactly that frame; it runs once per mount. */
+.sift-icon-in {
+  animation: sift-icon-fade 300ms var(--ease-out) both;
+  @media (prefers-reduced-motion: no-preference) {
+    animation-name: sift-icon-in;
+  }
+}
+@keyframes sift-icon-fade {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes sift-icon-in {
+  from {
+    opacity: 0;
+    scale: 0.25;
+    filter: blur(4px);
+  }
+}
+
+/* Theme switch: no colour transition fires while the ground changes (lib/theme.ts adds this for one frame). */
+.sift-no-transitions,
+.sift-no-transitions *,
+.sift-no-transitions *::before,
+.sift-no-transitions *::after {
+  transition: none !important;
 }

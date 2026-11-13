@@ -48,7 +48,7 @@ export function AddField({ id, label, placeholder, index, onAdd, blurOnSubmit }:
         }}
       />
       {open && t && (
-        <CommandList className="mt-1 rounded-md border bg-popover shadow-md">
+        <CommandList className="mt-1 overscroll-contain rounded-md border bg-popover shadow-md">
           <CommandGroup>
             {!index.includes(t) && (
               <CommandItem value={`+${t}`} onMouseDown={(e) => e.preventDefault()} onSelect={() => add(t)}>

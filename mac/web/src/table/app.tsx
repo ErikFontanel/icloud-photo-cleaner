@@ -122,6 +122,7 @@ export function TableApp() {
       <button
         id="tray"
         type="button"
+        data-press
         onClick={() => engine?.restoreTray()}
         title="Click to put its photos back on the table"
         className="fixed bottom-3.5 left-1/2 min-w-40 -translate-x-1/2 cursor-pointer rounded-xl border-[1.5px] border-dashed bg-card px-3.5 py-2.5 text-left transition-[border-color,translate] [&.hot]:-translate-y-1 [&.hot]:border-destructive"
@@ -179,7 +180,11 @@ function Inspector({ engine, hud, sel }: { engine: Engine; hud: Hud; sel: Select
     return r;
   };
   return (
-    <Card className="fixed top-16 right-3 max-h-[calc(100vh-160px)] w-80 gap-0 overflow-auto py-3" role="region" aria-label="Selection">
+    <Card
+      className="sift-pop fixed top-16 right-3 max-h-[calc(100vh-160px)] w-80 gap-0 overflow-auto overscroll-contain py-3 shadow-lg [--from:8px_0]"
+      role="region"
+      aria-label="Selection"
+    >
       <CardContent className="grid gap-4 px-3">
         <div className="grid gap-1">
           <EventTitle name={sel.name} label={sel.label} />
@@ -216,7 +221,7 @@ function KeyHelp() {
     ["⌘A Esc Z", "select all · clear · zoom to selection"],
   ];
   return (
-    <Card id="help" className="gap-2 py-3 text-xs text-muted-foreground max-md:hidden">
+    <Card id="help" className="sift-pop gap-2 py-3 text-xs text-muted-foreground shadow-lg max-md:hidden">
       <CardContent className="grid gap-1.5 px-3">
         {rows.map(([k, t]) => (
           <div key={k + t}>
@@ -267,7 +272,7 @@ function QuickLook({ ql, onClose }: { ql: HudState["ql"]; onClose: () => void })
     >
       {ql && size && (
         <>
-          <img ref={big} src={ql.src} alt="" style={size} className="max-w-none bg-tile object-contain shadow-2xl" />
+          <img ref={big} src={ql.src} alt="" style={size} className="sift-photo max-w-none bg-tile object-contain shadow-2xl" />
           <span className="fixed inset-x-0 bottom-4.5 text-center text-muted-foreground">{ql.caption}</span>
         </>
       )}

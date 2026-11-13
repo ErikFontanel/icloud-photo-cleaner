@@ -1,4 +1,5 @@
 import { MoonIcon, SunIcon } from "lucide-react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ButtonGroup, ButtonGroupText } from "@/components/ui/button-group";
 import { Kbd } from "@/components/ui/kbd";
@@ -65,12 +66,14 @@ export function ViewNav({ step, onStep, layout, onLayout }: Props) {
 
 export function ThemeButton() {
   const dark = useTheme() === "dark",
-    label = dark ? "Light ground" : "Dark ground";
+    label = dark ? "Light ground" : "Dark ground",
+    [switched, setSwitched] = useState(false), // the icon animates on a switch, not on page load
+    swap = switched ? "sift-icon-in" : undefined;
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <Button variant="outline" size="icon-sm" aria-label={label} onClick={toggleTheme}>
-          {dark ? <SunIcon /> : <MoonIcon />}
+        <Button variant="outline" size="icon-sm" aria-label={label} onClick={() => (setSwitched(true), toggleTheme())}>
+          {dark ? <SunIcon key="sun" className={swap} /> : <MoonIcon key="moon" className={swap} />}
         </Button>
       </TooltipTrigger>
       <TooltipContent>{label}</TooltipContent>

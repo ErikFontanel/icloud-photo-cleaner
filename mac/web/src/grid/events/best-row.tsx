@@ -51,7 +51,13 @@ export function BestRow({ p }: { p: Pile }) {
                     )}
                     action={() => edit("/api/table/favorite", { uuids: [u], on: !mine.has(u) }, [p.key])}
                   >
-                    <HeartIcon className={cn("size-5", fav.has(u) && "fill-white", mine.has(u) && "fill-event stroke-event")} />
+                    <HeartIcon
+                      className={cn(
+                        "size-5 transition-[fill,stroke] duration-150 ease-out",
+                        fav.has(u) && "fill-white",
+                        mine.has(u) && "fill-event stroke-event",
+                      )}
+                    />
                   </ActionButton>
                 </div>
               );
