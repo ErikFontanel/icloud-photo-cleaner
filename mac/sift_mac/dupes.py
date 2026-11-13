@@ -12,7 +12,7 @@ MAX_DIST = 0.6  # loosest feature print distance considered at all
 IMPORT_HOUR_MIN = 500  # an hour with this many photos is an import whose dates were lost
 IMPORT_MAX_DIST = 0.3  # import-dated photos have no usable time, so they need a stricter distance
 NEAR = 0.15  # precision 1.00 on 90 labelled pairs (2026-11-11): bulk-approve tier
-POSSIBLE = 0.35  # precision 0.77, recall 0.82: decide-per-set tier, default keep all
+POSSIBLE = 0.45  # precision 0.64, recall 0.92 on the same pairs: decide-per-set tier, default keep all, so recall wins
 LABEL_BINS = [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]
 LABELS_PER_BIN = 15
 
@@ -111,7 +111,8 @@ def best_shot(db: sqlite3.Connection, uuids: list[str]) -> str:
 
 
 def review_sets(db: sqlite3.Connection) -> dict[str, list[dict]]:
-    """Undecided duplicate sets in two tiers. A photo sits in at most one set; near-identical sets claim photos first."""
+    """Duplicate sets with an undecided photo, in two tiers. A photo sits in at most one set; near-identical sets claim
+    photos first. A set keeps its decided photos, so a new photo is compared with the shots already kept."""
     pairs = candidate_pairs(db)
     near = sets(pairs, NEAR)
     claimed = {u for g in near for u in g}
@@ -121,7 +122,7 @@ def review_sets(db: sqlite3.Connection) -> dict[str, list[dict]]:
     for tier, groups in (("near", near), ("possible", possible)):
         rows = []
         for g in groups:
-            if decided & set(g):
+            if set(g) <= decided:
                 continue
             dates = dict(db.execute(f"select uuid, date from assets where uuid in ({','.join('?' * len(g))})", g))
             g = sorted(g, key=lambda u: dates[u])

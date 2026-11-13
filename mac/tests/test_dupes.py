@@ -75,6 +75,8 @@ def test_review_sets_two_tiers_and_decided_sets_leave(db):
     assert [s["uuids"] for s in sets["possible"]] == [["p1", "p2"]]
     apply.decide(db, "dupes", "near", accept=["n1"], reject=["n2"])
     assert dupes.review_sets(db)["near"] == []
+    add(db, "n3", t.format(8), [0.08, 0])  # a later scan finds another near copy: the set returns with its decided photos
+    assert [s["uuids"] for s in dupes.review_sets(db)["near"]] == [["n1", "n2", "n3"]]
 
 
 def set_cols(db, uuid, **cols):
