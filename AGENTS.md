@@ -12,6 +12,15 @@ Two apps that sort a photo library without deleting anything:
 - **Edit `project.yml`, then run `scripts/generate.sh`.** `Sift.xcodeproj` is generated and not in git; plain `xcodegen generate` misses the `.env` values.
 - **Python runs through `uv`** (`uv run ...` in `mac/`).
 
+## State machines
+
+Change these in one place, and test each transition there:
+
+- iOS review screen: `ReviewSession` (`Sift/Features/Review/ReviewSession.swift`) owns which photo is up (reviewing, summary, sorted). `ReviewView` only animates it.
+- Mac writes: one operation slot in `server.py` (`claim`/`operation`). Scan, apply and undo take it; a second one gets HTTP 409.
+- Mac table build: `table.py` writes a build's result only if no newer build started, and a failed build retries on the next request.
+- Web table: the pointer `mode` in `table.js` gates the keyboard; no key changes selection, layout or undo during a gesture.
+
 ## Checks
 
 Edits are formatted and linted automatically (`.claude/hooks/`): swift-format for Swift, ruff for Python, Biome for the web UI. Fix what the hook reports before moving on. Commits run `lefthook.yml`; push runs the unit tests. Use `LEFTHOOK=0` only when the user says so.
