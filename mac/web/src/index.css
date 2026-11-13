@@ -1,0 +1,92 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+/* Light and dark grounds; the system setting decides until the viewer picks one. public/theme-boot.js sets .dark before paint. */
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  --radius: 0.5rem;
+  --background: #e9e7e2;
+  --foreground: #1d1d1f;
+  --card: #f6f5f2;
+  --card-foreground: #1d1d1f;
+  --popover: #faf9f6;
+  --popover-foreground: #1d1d1f;
+  --primary: #1f66d1;
+  --primary-foreground: #ffffff;
+  --secondary: #dcd9d2;
+  --secondary-foreground: #1d1d1f;
+  --muted: #dedbd4;
+  --muted-foreground: #6c6a65;
+  --accent: #dedbd4;
+  --accent-foreground: #1d1d1f;
+  --destructive: #d4412f;
+  --border: #d3d0c9;
+  --input: #cfccc4;
+  --ring: #1f66d1;
+  --keep: #23824f;
+  --event: #9a6200;
+  --tile: #d9d6cf;
+}
+.dark {
+  --background: #1c1d1f;
+  --foreground: #e9e6df;
+  --card: #232528;
+  --card-foreground: #e9e6df;
+  --popover: #26282b;
+  --popover-foreground: #e9e6df;
+  --primary: #5aa2ff;
+  --primary-foreground: #0d1b2e;
+  --secondary: #303236;
+  --secondary-foreground: #e9e6df;
+  --muted: #2b2d31;
+  --muted-foreground: #9a9890;
+  --accent: #303236;
+  --accent-foreground: #e9e6df;
+  --destructive: #ff6b5e;
+  --border: #3a3d42;
+  --input: #3a3d42;
+  --ring: #5aa2ff;
+  --keep: #59c48a;
+  --event: #f2c46d;
+  --tile: #2b2d31;
+  color-scheme: dark;
+}
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-keep: var(--keep);
+  --color-event: var(--event);
+  --color-tile: var(--tile);
+  --font-sans: -apple-system, BlinkMacSystemFont, "Inter", system-ui, sans-serif;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+  }
+}

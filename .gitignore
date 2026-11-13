@@ -11,4 +11,5 @@ mac/helper/.build/
 Sift.xcodeproj/
 .claude/settings.local.json
 node_modules/
+mac/sift_mac/web/
 .ruff_cache/

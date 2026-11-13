@@ -8,7 +8,8 @@ Requirements: Xcode 26.1 or later, XcodeGen (`brew install xcodegen`), an iPhone
 
 ```sh
 cp .env.example .env       # then set your bundle ID prefix, team ID and home locations
-pnpm install               # Biome and the lefthook git hooks
+pnpm install               # Biome, the lefthook git hooks and the Mac review page
+pnpm --dir mac/web build   # builds the Mac review page into mac/sift_mac/web/
 scripts/generate.sh        # makes Sift.xcodeproj from project.yml and .env
 scripts/test.sh            # unit tests + UI tests on the iPhone 17 Pro simulator
 cd mac && uv run pytest -m "not photos"   # Mac companion tests

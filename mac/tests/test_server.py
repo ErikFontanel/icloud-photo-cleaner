@@ -185,3 +185,20 @@ def test_a_locked_database_answers_with_json(base, monkeypatch):
     with pytest.raises(HTTPError) as e:
         post(base + "/api/decide", {"group": "blurry", "accept": ["u1"]})
     assert e.value.code == 409 and json.load(e.value) == {"error": "database is locked"}
+
+
+def test_static_files_come_from_the_build_only(tmp_path, monkeypatch):
+    from sift_mac import server
+
+    (tmp_path / "assets").mkdir()
+    (tmp_path / "index.html").write_text("grid")
+    (tmp_path / "table.html").write_text("table")
+    (tmp_path / "assets" / "app.js").write_text("js")
+    (tmp_path.parent / "secret.js").write_text("no")
+    monkeypatch.setattr(server, "WEB", tmp_path)
+    assert server.static_file("/").read_text() == "grid"
+    assert server.static_file("/table").read_text() == "table"
+    assert server.static_file("/assets/app.js").read_text() == "js"
+    assert server.static_file("/../secret.js") is None  # outside the build
+    assert server.static_file("/assets/missing.js") is None
+    assert server.static_file("/api/junk") is None

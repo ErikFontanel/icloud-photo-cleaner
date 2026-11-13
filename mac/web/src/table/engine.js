@@ -1,7 +1,9 @@
-// Sift Table (proof of concept). Every photo is one instance in a single WebGL2 draw: tiny thumbnails come from
-// texture atlases; photos drawn large get a sharper copy at the size they are shown. Nothing is saved.
-// ?demo=N draws N generated tiles instead of the library (used to test speed without showing photos).
-(() => {
+// Sift Table. Every photo is one instance in a single WebGL2 draw: tiny thumbnails come from texture atlases;
+// photos drawn large get a sharper copy at the size they are shown. ?demo=N draws N generated tiles instead of the
+// library (used to test speed without showing photos).
+// The canvas, labels and pointer/keyboard input live here; the HUD around it is React (table/app.tsx). The engine
+// publishes what the HUD shows through `hud.set` and returns the actions the HUD's buttons call.
+export function startTable(hud) {
   const $ = (id) => document.getElementById(id);
   const DEMO = Number(new URLSearchParams(location.search).get("demo")) || 0;
   const BORDER = 0.025,
@@ -92,7 +94,7 @@
       const m = await r.json();
       if (m.error) throw new Error(m.error);
       if (!m.building) return m;
-      $("loading").textContent = `Making thumbnails: ${m.done.toLocaleString()} of ${m.total.toLocaleString()}…`;
+      hud.set({ loading: `Making thumbnails: ${m.done.toLocaleString()} of ${m.total.toLocaleString()}…` });
       await new Promise((ok) => setTimeout(ok, 500));
     }
   }
@@ -145,8 +147,8 @@
   const canvas = $("gl"),
     gl = canvas.getContext("webgl2", { antialias: false, premultipliedAlpha: true, alpha: false });
   if (!gl) {
-    $("loading").textContent = "This browser has no WebGL2.";
-    return;
+    hud.set({ loading: "This browser has no WebGL2." });
+    return null;
   }
   const VS = `#version 300 es
   precision highp float;
@@ -325,6 +327,11 @@
   }
   const toWorld = (sx, sy) => [(sx - vw / 2) / cam.z + cam.x, (sy - vh / 2) / cam.z + cam.y];
   const toScreen = (wx, wy) => [(wx - cam.x) * cam.z + vw / 2, (wy - cam.y) * cam.z + vh / 2];
+  // Where photo i is drawn on screen (unrotated): quick look grows out of it and shrinks back into it.
+  const screenBox = (i) => {
+    const [sx, sy] = toScreen(x[i], y[i]);
+    return { left: sx - hw[i] * cam.z, top: sy - hh[i] * cam.z, width: 2 * hw[i] * cam.z, height: 2 * hh[i] * cam.z };
+  };
 
   function fitTo(idx, animate = true) {
     let x0 = Infinity,
@@ -453,8 +460,8 @@
   }
   let ground = [0.11, 0.114, 0.122];
   function readGround() {
-    // the table colour follows the light/dark theme (theme.css --table)
-    const hex = getComputedStyle(document.documentElement).getPropertyValue("--table").trim().replace("#", "");
+    // the table colour follows the light/dark ground (index.css --background)
+    const hex = getComputedStyle(document.documentElement).getPropertyValue("--background").trim().replace("#", "");
     if (hex.length === 6) ground = [0, 2, 4].map((k) => parseInt(hex.slice(k, k + 2), 16) / 255);
     redraw();
   }
@@ -743,7 +750,7 @@
     } catch {
       /* the hash is only a convenience */
     }
-    document.querySelectorAll("[data-layout]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.layout === name)));
+    hud.set({ layout: name });
     const idx = onTable(),
       n = idx.length,
       tx = new Float32Array(n),
@@ -978,7 +985,7 @@
     save(idx);
     startRename(groups.length - 1);
   }
-  let renaming = -1;
+  let renaming = -1; // the event R or N names; else the one most of the selection is in
   function startRename(g) {
     if (g === undefined) {
       const idx = selected();
@@ -988,31 +995,18 @@
       g = [...c.keys()].sort((a, b) => c.get(b) - c.get(a))[0];
     }
     renaming = g;
-    const box = $("rename");
-    box.hidden = false;
-    box.value = groups[g].name || groups[g].label;
-    box.focus();
-    box.select();
+    inspect();
+    hud.focus("evname");
   }
-  $("rename").addEventListener("keydown", async (e) => {
-    e.stopPropagation();
-    if (e.key === "Enter" && $("rename").value.trim()) {
-      const g = renaming,
-        value = $("rename").value.trim();
-      groups[g].name = value;
-      refreshLabels();
-      inspect();
-      try {
-        pending((await api("/api/table/name", { pile: groups[g].key, name: value })).pending);
-      } catch (err) {
-        say(err.message);
-      }
-    }
-    if (e.key === "Enter" || e.key === "Escape") {
-      $("rename").hidden = true;
-      $("rename").blur();
-    }
-  });
+  // The inspector's name field: the event's name becomes its album's name on Apply.
+  async function setName(value) {
+    const g = hud.get().selection?.g;
+    if (g === undefined) return;
+    groups[g].name = value;
+    refreshLabels();
+    inspect();
+    pending((await api("/api/table/name", { pile: groups[g].key, name: value })).pending);
+  }
 
   // ---------- selection, actions, undo ----------
   const undoStack = [];
@@ -1105,8 +1099,8 @@
     refreshLabels();
     save(idx);
     const tray = $("tray");
-    tray.classList.add("hot");
-    setTimeout(() => tray.classList.remove("hot"), 250);
+    tray?.classList.add("hot");
+    setTimeout(() => tray?.classList.remove("hot"), 250);
   }
   function restoreTray() {
     const idx = [];
@@ -1178,13 +1172,13 @@
         n++;
         if (sel[i]) s++;
       }
-    $("status").textContent = `${n.toLocaleString()} on the table${s ? ` · ${s.toLocaleString()} selected` : ""}${note ? ` · ${note}` : ""}`;
+    hud.set({ status: `${n.toLocaleString()} on the table${s ? ` · ${s.toLocaleString()} selected` : ""}${note ? ` · ${note}` : ""}` });
     inspect();
   }
   function counts() {
     let a = 0;
     for (let i = 0; i < N; i++) if (st[i] === DELETE) a++;
-    $("n1").textContent = a.toLocaleString();
+    hud.set({ deleteCount: a });
   }
 
   // ---------- quick look ----------
@@ -1199,31 +1193,40 @@
   function showQL() {
     if (!qlList.length) return closeQL();
     qlAt = Math.max(0, Math.min(qlAt, qlList.length - 1));
-    const i = qlList[qlAt],
-      img = $("ql").querySelector("img");
+    const i = qlList[qlAt];
+    let src = `/thumb/${uuid[i]}?s=1600`;
     if (DEMO) {
       const c = document.createElement("canvas"),
         b = demoHi(i, 900);
       c.width = b.width;
       c.height = b.height;
       c.getContext("2d").drawImage(b, 0, 0);
-      img.src = c.toDataURL();
-    } else img.src = `/thumb/${uuid[i]}?s=1600`;
-    $("ql").querySelector("p").textContent =
-      `${new Date(tsec[i] * 1000).toLocaleString()} · ${qlAt + 1} of ${qlList.length} · ←/→ browse · ⌫ To Delete · Space close`;
-    $("ql").hidden = false;
+      src = c.toDataURL();
+    }
+    const was = hud.get().ql;
+    hud.set({
+      ql: {
+        src,
+        caption: `${new Date(tsec[i] * 1000).toLocaleString()} · ${qlAt + 1} of ${qlList.length} · ←/→ browse · ⌫ To Delete · Space close`,
+        aspect: hw[i] / hh[i],
+        at: qlAt,
+        i,
+        from: was && !was.closing ? undefined : screenBox(i), // opening: grow out of the photo
+      },
+    });
   }
+  // The HUD shrinks the photo back onto the table (`to`), then clears ql.
   function closeQL() {
-    $("ql").hidden = true;
+    const i = qlList[qlAt],
+      ql = hud.get().ql;
     qlList = [];
+    if (ql && !ql.closing) hud.set({ ql: { ...ql, closing: true, to: i !== undefined && on(i) ? screenBox(i) : null } });
   }
 
   // ---------- shared state: saved at once, the same decisions the Grid review uses ----------
   let tagsOf = new Map(),
     albumsOf = new Map(),
     addsOf = new Map(),
-    tagIndex = [],
-    albumIndex = [],
     lastApply = null;
   async function api(path, body) {
     if (DEMO) return demoApi(path, body);
@@ -1268,25 +1271,23 @@
       tags,
       albums: {},
       album_adds: adds,
+      album_removes: {},
       tag_index: [...new Set(Object.values(tags).flat())].sort(),
       album_index: [...new Set(Object.values(adds).flat())].sort(),
       runs: [],
     };
   }
-  function useState(s) {
+  function takeState(s) {
     tagsOf = new Map(Object.entries(s.tags));
     albumsOf = new Map(Object.entries(s.albums));
     addsOf = new Map(Object.entries(s.album_adds));
-    tagIndex = s.tag_index;
-    albumIndex = s.album_index;
     inAlbum = new Uint8Array(N);
     const index = new Map(uuid.map((u, i) => [u, i]));
     for (const u of albumsOf.keys()) {
       const i = index.get(u);
       if (i !== undefined) inAlbum[i] = 1;
     }
-    $("tagindex").replaceChildren(...tagIndex.map((w) => Object.assign(document.createElement("option"), { value: w })));
-    $("albumindex").replaceChildren(...albumIndex.map((w) => Object.assign(document.createElement("option"), { value: w })));
+    hud.set({ st: s });
     pending(s.pending);
     inspect();
   }
@@ -1312,7 +1313,7 @@
       grp[i] = keyOf.get(key);
     }
     for (const [key, name] of Object.entries(s.names)) if (keyOf.has(key)) groups[keyOf.get(key)].name = name;
-    useState(s);
+    takeState(s);
   }
   let saving = Promise.resolve();
   function save(idx) {
@@ -1332,64 +1333,30 @@
   let pend = { delete: 0, renames: 0, albums: 0, album_photos: 0, keywords: 0 };
   function pending(p) {
     if (p) pend = p;
-    const parts = [
-      pend.delete && `${pend.delete} to delete`,
-      pend.albums && `${pend.album_photos} photos into ${pend.albums} albums`,
-      pend.renames && `${pend.renames} album renames`,
-      pend.keywords && `keywords on ${pend.keywords} photos`,
-      pend.locations && `pins on ${pend.locations} photos`,
-      pend.favorites && `${pend.favorites} favourites`,
-      pend.album_removals && `${pend.album_removals} photos out of albums`,
-    ].filter(Boolean);
-    const box = $("applybox");
-    box.replaceChildren();
-    if (parts.length) {
-      const b = Object.assign(document.createElement("button"), { className: "primary", textContent: "Apply to Photos", title: parts.join(" · ") });
-      b.onclick = () => confirmApply(parts);
-      box.append(Object.assign(document.createElement("span"), { className: "muted", textContent: parts.join(" · ") }), b);
-    } else box.append(Object.assign(document.createElement("span"), { className: "muted", textContent: "No changes to apply" }));
-    if (lastApply) {
-      const u = Object.assign(document.createElement("button"), { textContent: "Undo last apply" });
-      u.onclick = undoApply;
-      box.append(u);
-    }
+    hud.set({ pending: pend, lastApply: !!lastApply });
   }
-  function confirmApply(parts) {
-    const box = $("applybox"),
-      yes = Object.assign(document.createElement("button"), { className: "primary", textContent: "Write to Photos" });
-    const no = Object.assign(document.createElement("button"), { textContent: "Cancel" });
-    box.replaceChildren(Object.assign(document.createElement("span"), { textContent: `Write ${parts.join(", ")} to the library Photos has open?` }), yes, no);
-    no.onclick = () => pending();
-    yes.onclick = async () => {
-      const stop = applyProgress(box);
-      try {
-        await saving;
-        const r = await api("/api/table/apply", {}).finally(stop);
-        lastApply = Object.values(r.result)
-          .map((x) => x.run)
-          .filter(Boolean);
-        const index = new Map(uuid.map((u, i) => [u, i]));
-        for (const u of r.gone) {
-          const i = index.get(u);
-          if (i !== undefined) st[i] = GONE;
-        }
-        counts();
-        useState(r);
-        gridDirty = true;
-        redraw();
-        say(
-          `Written: ${Object.entries(r.result)
-            .map(
-              ([k, v]) =>
-                `${k} ${v.added ?? 0} added${v.keywords ? `, ${v.keywords} keywords` : ""}${v.renamed ? `, ${v.renamed} renamed` : ""}${v.locations ? `, ${v.locations} pins` : ""}${v.favorites ? `, ${v.favorites} favourites` : ""}${v.refused ? `, ${v.refused} refused` : ""}`,
-            )
-            .join(" · ")}`,
-        );
-      } catch (err) {
-        pending();
-        say(err.message);
-      }
-    };
+  // Apply to Photos (the HUD asks first and shows progress): waits for the last save, then writes everything saved.
+  async function apply() {
+    await saving;
+    const r = await api("/api/table/apply", {});
+    lastApply = Object.values(r.result)
+      .map((x) => x.run)
+      .filter(Boolean);
+    const index = new Map(uuid.map((u, i) => [u, i]));
+    for (const u of r.gone) {
+      const i = index.get(u);
+      if (i !== undefined) st[i] = GONE;
+    }
+    counts();
+    takeState(r);
+    gridDirty = true;
+    redraw();
+    return `Written: ${Object.entries(r.result)
+      .map(
+        ([k, v]) =>
+          `${k} ${v.added ?? 0} added${v.keywords ? `, ${v.keywords} keywords` : ""}${v.renamed ? `, ${v.renamed} renamed` : ""}${v.locations ? `, ${v.locations} pins` : ""}${v.favorites ? `, ${v.favorites} favourites` : ""}${v.refused ? `, ${v.refused} refused` : ""}`,
+      )
+      .join(" · ")}`;
   }
   async function undoApply() {
     say("Undoing the last apply in Photos…");
@@ -1402,141 +1369,41 @@
     }
   }
 
-  // ---------- inspector: event name, tags and albums of the selection ----------
-  const chip = (text, onRemove, cls) => {
-    const c = Object.assign(document.createElement("span"), { className: `tag${cls ? ` ${cls}` : ""}`, textContent: text });
-    if (onRemove) {
-      const x = Object.assign(document.createElement("button"), { textContent: "×", title: "Remove" });
-      x.onclick = onRemove;
-      c.append(x);
-    }
-    return c;
-  };
+  // ---------- inspector: the HUD shows the event, place, tags and albums of the selection ----------
   function inspect() {
-    const panel = $("inspect"),
-      idx = selected();
+    const idx = selected();
     if (!idx.length || mode === "drag") {
-      panel.hidden = true;
+      hud.set({ selection: null });
       return;
     }
-    panel.hidden = false;
-    const piles = new Map(),
-      tags = new Map(),
-      albums = new Map(),
-      adds = new Map();
-    for (const i of idx) {
-      piles.set(grp[i], (piles.get(grp[i]) || 0) + 1);
-      for (const w of tagsOf.get(uuid[i]) || []) tags.set(w, (tags.get(w) || 0) + 1);
-      for (const a of albumsOf.get(uuid[i]) || []) albums.set(a, (albums.get(a) || 0) + 1);
-      for (const a of addsOf.get(uuid[i]) || []) adds.set(a, (adds.get(a) || 0) + 1);
-    }
-    const g = [...piles.keys()].sort((a, b) => piles.get(b) - piles.get(a))[0],
-      n = idx.length;
-    const of = (c) => (c === n ? "" : ` ${c}/${n}`);
-    $("evname").textContent = groups[g].name ? `Album: ${groups[g].name}` : groups[g].label ? `Suggested: ${groups[g].label}` : "Unnamed event";
-    $("evname").className = groups[g].name ? "album" : "";
-    $("evmeta").textContent = piles.size > 1 ? `${piles.size} events selected · M merges them` : `${members().get(g)?.length || 0} photos in this event`;
-    const us = idx.map((i) => uuid[i]);
-    $("tags").replaceChildren(...[...tags].sort((a, b) => b[1] - a[1]).map(([w, c]) => chip(w + of(c), () => editTags(us, [], [w]))));
-    $("albums").replaceChildren(
-      ...[...albums].map(([a, c]) => chip(a + of(c), null)),
-      ...[...adds].map(([a, c]) => chip(`+ ${a}${of(c)}`, () => editAlbum(us, a, true), "new")),
-    );
-    showSpots(
-      us,
-      (members().get(g) || []).map((i) => uuid[i]),
-      groups[g].name || groups[g].label || "",
-    );
-  }
-  // Place of the selected photos without GPS, grouped by city (set or suggested); asked after the selection settles.
-  let spotTimer = 0,
-    spotAsk = 0;
-  function showSpots(us, pileUs, name) {
-    clearTimeout(spotTimer);
-    const ask = ++spotAsk;
-    spotTimer = setTimeout(async () => {
-      let r;
-      try {
-        r = await api("/api/table/place-info", { uuids: us, pile_uuids: pileUs, name });
-      } catch (err) {
-        return say(err.message);
-      }
-      if (ask !== spotAsk) return;
-      const line = (g) => {
-        const d = document.createElement("div");
-        d.className = g.set ? "set" : g.city ? "" : "none";
-        d.textContent = `📍 ${!g.city ? "No location" : g.exact ? `${g.lat.toFixed(5)}, ${g.lon.toFixed(5)} near ${g.city}, ${g.country}` : `${g.city}, ${g.country}`} · ${g.uuids.length}${g.set ? " set" : g.city ? " suggested" : ""} `;
-        if (g.city && !g.set)
-          d.append(
-            Object.assign(document.createElement("button"), {
-              className: "use",
-              textContent: "Use",
-              title: `Suggested from ${g.from}`,
-              onclick: () => setPlace(g.uuids, g.city, g.country),
-            }),
-          );
-        if (g.set) d.append(Object.assign(document.createElement("button"), { textContent: "×", title: "Clear", onclick: () => setPlace(g.uuids, "") }));
-        return d;
-      };
-      $("spots").replaceChildren(
-        ...(r.spots.length
-          ? r.spots.map(line)
-          : [Object.assign(document.createElement("div"), { className: "none", textContent: "Every selected photo has GPS" })]),
-      );
-    }, 150);
-  }
-  async function setPlace(us, city, country) {
-    try {
-      pending((await api("/api/table/place", { uuids: us, city, country: country || "" })).pending);
-      inspect();
-    } catch (err) {
-      say(err.message);
-    }
+    const piles = new Map();
+    for (const i of idx) piles.set(grp[i], (piles.get(grp[i]) || 0) + 1);
+    if (!piles.has(renaming)) renaming = -1;
+    const g = renaming >= 0 ? renaming : [...piles.keys()].sort((a, b) => piles.get(b) - piles.get(a))[0];
+    const pileUuids = (members().get(g) || []).map((i) => uuid[i]);
+    hud.set({
+      selection: {
+        g,
+        uuids: idx.map((i) => uuid[i]),
+        pileUuids,
+        name: groups[g].name || "",
+        label: groups[g].label || "",
+        events: piles.size,
+      },
+    });
   }
   function focusInspect(id) {
     if (!selected().length) return say("Select photos first");
     inspect();
-    $(id).focus();
+    hud.focus(id);
   }
-  async function editTags(us, add, remove) {
-    try {
-      useState(await api("/api/table/tags", { uuids: us, add, remove }));
-    } catch (err) {
-      say(err.message);
-    }
-  }
-  async function editAlbum(us, album, remove) {
-    try {
-      useState(await api("/api/table/album", { uuids: us, album, remove }));
-    } catch (err) {
-      say(err.message);
-    }
-  }
-  for (const [id, fn] of [
-    ["tagin", (us, v) => editTags(us, [v], [])],
-    ["albumin", (us, v) => editAlbum(us, v, false)],
-    ["placein", (us, v) => setPlace(us, v)],
-  ]) {
-    $(id).addEventListener("keydown", (e) => {
-      e.stopPropagation();
-      if (e.key === "Escape") e.target.blur();
-      if (e.key !== "Enter" || !e.target.value.trim()) return;
-      fn(
-        selected().map((i) => uuid[i]),
-        e.target.value.trim(),
-      );
-      e.target.value = "";
-      e.target.blur(); // keys go back to the table
-    });
-  }
-  $("evrename").onclick = () => startRename();
 
   // ---------- eraser: click or drag over photos to mark them To Delete ----------
   let erasing = false,
     stroke = [];
   function setEraser(on) {
     erasing = on;
-    $("eraser").setAttribute("aria-pressed", String(on));
+    hud.set({ erasing: on });
     canvas.classList.toggle("erasing", on);
     gl.uniform1f(uErase, on ? 1 : 0);
     say(on ? "Eraser: click or drag over photos to mark them To Delete. E or Esc to stop." : "");
@@ -1581,7 +1448,7 @@
     hotTray = null;
   canvas.addEventListener("pointerdown", (e) => {
     canvas.setPointerCapture(e.pointerId);
-    $("help").hidden = true; // ? brings it back
+    hud.set({ help: false }); // ? brings it back
     last = [e.clientX, e.clientY];
     moved = false;
     if (spaceDown || e.button === 1) {
@@ -1778,6 +1645,7 @@
   );
 
   addEventListener("keydown", (e) => {
+    if (e.target.closest?.("input, textarea, [role=dialog], [role=alertdialog]")) return; // typing in the HUD
     if (e.key === " ") {
       e.preventDefault();
       if (!e.repeat) {
@@ -1787,7 +1655,7 @@
       return;
     }
     if (mode) return; // no key changes selection, layout or undo during a pointer gesture
-    const ql = !$("ql").hidden;
+    const ql = qlList.length > 0;
     if (ql) {
       if (e.key === "ArrowRight") {
         qlAt++;
@@ -1846,22 +1714,17 @@
     else if (e.key === "r") {
       e.preventDefault();
       startRename();
-    } else if (e.key === "?") $("help").hidden = !$("help").hidden;
+    } else if (e.key === "?") hud.set({ help: !hud.get().help });
   });
   addEventListener("keyup", (e) => {
     if (e.key !== " " || e.target.closest?.("input, textarea")) return; // a space typed in a field
     spaceDown = false;
-    if (!spaceUsed && $("ql").hidden) {
+    if (!spaceUsed && !qlList.length) {
       const s = selected();
       const i = hover >= 0 ? hover : s[0];
       if (i !== undefined && i >= 0) quickLook(i);
     } else if (!spaceUsed) closeQL();
   });
-  $("ql").addEventListener("click", closeQL);
-  document.querySelectorAll("[data-layout]").forEach((b) => (b.onclick = () => applyLayout(b.dataset.layout)));
-  $("fit").onclick = () => fitTo(onTable());
-  $("undo").onclick = undo;
-  $("eraser").onclick = () => setEraser(!erasing);
   function setHideAlbums(v) {
     hideAlbums = v;
     try {
@@ -1869,16 +1732,13 @@
     } catch {
       /* not remembered */
     }
-    $("hidealbums").setAttribute("aria-pressed", String(v));
+    hud.set({ hideAlbums: v });
     for (let i = 0; i < N; i++) if (!on(i)) sel[i] = 0;
     gridDirty = true;
     applyLayout(layout, true, false);
     refreshLabels();
     status(v ? "Photos already in an album are hidden" : "");
   }
-  $("hidealbums").onclick = () => setHideAlbums(!hideAlbums);
-  $("helpbtn").onclick = () => ($("help").hidden = !$("help").hidden);
-  $("tray").onclick = restoreTray;
   addEventListener("resize", resize);
 
   // ---------- start ----------
@@ -1904,9 +1764,9 @@
       });
       makeTextures();
       resize();
-      $("loading").hidden = true;
+      hud.set({ loading: null });
       await loadState();
-      $("hidealbums").setAttribute("aria-pressed", String(hideAlbums));
+      hud.set({ hideAlbums });
       const start = location.hash.slice(1);
       applyLayout(["pile", "events", "look", "time"].includes(start) ? start : "events", false);
       requestAnimationFrame(frame);
@@ -1915,8 +1775,23 @@
       await loadAtlases(m.photos);
       status(`thumbnails loaded in ${((performance.now() - t0) / 1000).toFixed(1)} s`);
     } catch (err) {
-      $("loading").hidden = false;
-      $("loading").textContent = `Could not start: ${err.message}`;
+      hud.set({ loading: `Could not start: ${err.message}` });
     }
   })();
-})();
+  return {
+    layout: (name) => applyLayout(name),
+    fit: () => fitTo(onTable()),
+    undo,
+    eraser: () => setEraser(!erasing),
+    hideAlbums: () => setHideAlbums(!hideAlbums),
+    restoreTray,
+    closeQL,
+    apply,
+    undoApply,
+    takeState,
+    pending,
+    setName,
+    say,
+    api,
+  };
+}
