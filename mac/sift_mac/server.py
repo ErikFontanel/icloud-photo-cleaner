@@ -11,18 +11,22 @@ from pathlib import Path
 
 from . import apply, config, dupes, edits, junk, photos_app, state, table
 
-WEB = Path(__file__).parent / "web"
-STATIC = {
-    "/": ("index.html", "text/html; charset=utf-8"),
-    "/app.js": ("app.js", "text/javascript; charset=utf-8"),
-    "/dupes.js": ("dupes.js", "text/javascript; charset=utf-8"),
-    "/table": ("table.html", "text/html; charset=utf-8"),
-    "/table.js": ("table.js", "text/javascript; charset=utf-8"),
-    "/events.js": ("events.js", "text/javascript; charset=utf-8"),
-    "/theme.css": ("theme.css", "text/css; charset=utf-8"),
-    "/theme.js": ("theme.js", "text/javascript; charset=utf-8"),
-    "/progress.js": ("progress.js", "text/javascript; charset=utf-8"),
+WEB = Path(__file__).parent / "web"  # built from mac/web by `pnpm --dir mac/web build`
+PAGES = {"/": "index.html", "/table": "table.html"}
+TYPES = {
+    ".html": "text/html",
+    ".js": "text/javascript",
+    ".css": "text/css",
+    ".svg": "image/svg+xml",
+    ".png": "image/png",
+    ".woff2": "font/woff2",
 }
+
+
+def static_file(path: str) -> Path | None:
+    """The built page or asset for a URL path, or None. Only files inside WEB are served."""
+    f = (WEB / PAGES.get(path, path.lstrip("/"))).resolve()
+    return f if f.is_file() and f.is_relative_to(WEB.resolve()) and f.suffix in TYPES else None
 
 
 SCAN = {"running": False, "result": "", "error": ""}  # the rescan started from the page
@@ -101,9 +105,12 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         db = state.connect(config.state_db())
         try:
-            if self.path.split("?")[0] in STATIC:
-                name, ctype = STATIC[self.path.split("?")[0]]
-                self._send(200, (WEB / name).read_bytes(), ctype)
+            if (f := static_file(self.path.split("?")[0])) is not None:
+                self._send(
+                    200, f.read_bytes(), f"{TYPES[f.suffix]}; charset=utf-8" if f.suffix in (".html", ".js", ".css") else TYPES[f.suffix]
+                )
+            elif self.path.split("?")[0] in PAGES:
+                self._send(503, b"The review page is not built. Run: pnpm --dir mac/web build", "text/plain; charset=utf-8")
             elif self.path == "/api/junk":
                 self._json(
                     {
@@ -195,8 +202,8 @@ class Handler(BaseHTTPRequestHandler):
             elif self.path == "/api/events/piles":
                 self._json(edits.piles_update(db, body["keys"]))
             elif self.path == "/api/table/place":
-                edits.set_place(db, body["uuids"], body.get("city", ""), body.get("country", ""))
-                self._json({"pending": edits.pending(db)})
+                found = edits.set_place(db, body["uuids"], body.get("city", ""), body.get("country", ""))
+                self._json({"pending": edits.pending(db), "place": found})  # the place it found, so the page can say which
             elif self.path == "/api/table/place-info":
                 self._json(edits.place_info(db, body["uuids"], body.get("pile_uuids", []), body.get("name", "")))
             elif self.path == "/api/table/keep":

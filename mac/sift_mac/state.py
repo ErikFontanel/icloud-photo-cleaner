@@ -18,7 +18,7 @@ create table if not exists assets (
     preview text,                         -- local preview file the analysis used
     score real,                           -- Vision aesthetics overallScore, -1..1
     utility integer,                      -- Vision isUtility
-    blur real,                            -- Laplacian variance; low is blurry
+    blur real,                            -- sharpness 0..1 of the sharpest region (vision.blur); low is blurry
     fp blob,                              -- Vision feature print, float32
     classes text,                         -- JSON {Vision classifier identifier: confidence} for vision.CLASSES
     emb blob,                             -- EmbeddingGemma 2 image embedding, float32 x 768 (junk photos only)

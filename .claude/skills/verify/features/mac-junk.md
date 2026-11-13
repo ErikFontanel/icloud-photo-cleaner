@@ -20,7 +20,7 @@ Preconditions:
 - `mac.sh doctor` is `UP`, and `pending.delete` is `0`.
 
 - **See the section.** Navigate to the page and choose the chip `Blurry · 1`. The fixture `blurry.jpg` shows with a `junk` badge.
-- **Mark.** Choose `Mark 1 as junk, keep 0`. The header changes from `No pending changes.` to a pending count.
+- **Mark.** Choose `Mark 1 as junk, keep 0`. The header changes from `Nothing to apply yet.` to a pending count.
 - **Second view.** Run `mac.sh doctor`. `state` shows `"pending": {"delete": 1, ...}`. Then run `mac.sh shot junk-marked /` for the screenshot.
 - **Apply (only with Photos.app open on "Sift Test").** Choose `Apply to Photos`. In Photos.app, the "Sift – To Delete" album holds the photo, and the photo is still in the library.
 

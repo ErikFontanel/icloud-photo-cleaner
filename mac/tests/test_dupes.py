@@ -9,7 +9,7 @@ def db():
     return state.connect(config.state_db())
 
 
-def add(db, uuid, date, fp, favorite=0, edited=0, score=0.0, blur=50.0):
+def add(db, uuid, date, fp, favorite=0, edited=0, score=0.0, blur=0.9):
     db.execute(
         "insert into assets (uuid, status, date, fp, favorite, edited, score, blur) values (?, 'analysed', ?, ?, ?, ?, ?, ?)",
         (uuid, date, np.asarray(fp, np.float32).tobytes(), favorite, edited, score, blur),
@@ -75,6 +75,8 @@ def test_review_sets_two_tiers_and_decided_sets_leave(db):
     assert [s["uuids"] for s in sets["possible"]] == [["p1", "p2"]]
     apply.decide(db, "dupes", "near", accept=["n1"], reject=["n2"])
     assert dupes.review_sets(db)["near"] == []
+    add(db, "n3", t.format(8), [0.08, 0])  # a later scan finds another near copy: the set returns with its decided photos
+    assert [s["uuids"] for s in dupes.review_sets(db)["near"]] == [["n1", "n2", "n3"]]
 
 
 def set_cols(db, uuid, **cols):

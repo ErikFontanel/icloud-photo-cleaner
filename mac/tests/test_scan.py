@@ -3,6 +3,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from types import SimpleNamespace
 
+import numpy as np
 import osxphotos
 import pytest
 
@@ -84,10 +85,33 @@ def test_feature_print_separates_burst_from_other_scenes(fixture_dir):
     assert burst < 0.1 < 0.2 < other
 
 
-def test_blur_measure(fixture_dir):
-    sharp, blurry = vision.blur(str(fixture_dir / "event_0.jpg")), vision.blur(str(fixture_dir / "blurry.jpg"))
-    print(f"blur sharp {sharp:.1f}, blurry {blurry:.1f}")
-    assert blurry < sharp / 10
+def test_blur_measure(fixture_dir, tmp_path):
+    from PIL import Image
+    from scipy.ndimage import uniform_filter1d
+
+    from sift_mac import junk
+
+    a = np.asarray(Image.open(fixture_dir / "event_0.jpg").convert("RGB"), dtype=np.float32)
+    Image.fromarray(uniform_filter1d(a, 25, axis=1).astype(np.uint8)).save(tmp_path / "motion.jpg")  # sideways shake
+    dof = uniform_filter1d(uniform_filter1d(a, 25, axis=0), 25, axis=1)  # soft background, sharp subject in the middle quarter
+    h, w = a.shape[:2]
+    dof[h // 4 : 3 * h // 4, w // 4 : 3 * w // 4] = a[h // 4 : 3 * h // 4, w // 4 : 3 * w // 4]
+    Image.fromarray(dof.astype(np.uint8)).save(tmp_path / "dof.jpg")
+    names = (fixture_dir / "event_0.jpg", fixture_dir / "blurry.jpg", tmp_path / "motion.jpg", tmp_path / "dof.jpg")
+    sharp, blurry, motion, depth = (vision.blur(str(p)) for p in names)
+    print(f"sharpness: sharp {sharp:.2f}, blurry {blurry:.2f}, motion {motion:.2f}, depth of field {depth:.2f}")
+    assert max(blurry, motion) < junk.BLURRY < min(sharp, depth)
+
+
+def test_new_blur_measure_re_measures_every_photo_once(db, fixture_dir):
+    scan([fake("a", fixture_dir / "event_0.jpg")], db)
+    db.execute("update assets set blur=123.0")
+    db.execute("update settings set value='old' where key='blur_measure'")
+    scan([fake("a", fixture_dir / "event_0.jpg")], db)
+    assert db.execute("select blur from assets").fetchone()[0] < 1
+    db.execute("update assets set blur=0.5")
+    scan([fake("a", fixture_dir / "event_0.jpg")], db)
+    assert db.execute("select blur from assets").fetchone() == (0.5,)  # same measure: not measured again
 
 
 @pytest.mark.photos

@@ -9,7 +9,7 @@ pre-commit:
     no-private:
       run: scripts/no-private.sh
     biome:
-      glob: "mac/sift_mac/web/*.{js,css,html}"
+      glob: "mac/web/**/*.{js,ts,tsx,css,html,json}"
       run: ./node_modules/.bin/biome check --write --no-errors-on-unmatched {staged_files}
       stage_fixed: true
     ruff:

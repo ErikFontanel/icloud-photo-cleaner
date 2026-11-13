@@ -1,0 +1,4 @@
+packages:
+  - mac/web
+allowBuilds:
+  lefthook: true

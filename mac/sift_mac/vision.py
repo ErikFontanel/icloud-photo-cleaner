@@ -10,6 +10,7 @@ from pathlib import Path
 
 import numpy as np
 from PIL import Image
+from scipy.ndimage import uniform_filter1d
 
 HELPER_DIR = Path(__file__).parent.parent / "helper"
 HELPER = HELPER_DIR / ".build" / "release" / "sift-vision"
@@ -63,13 +64,32 @@ def analyse(paths: list[str]) -> dict[str, dict]:
     return results
 
 
+BLUR_MEASURE = "sharpest-tile"  # stored in settings; scan re-measures every photo when it changes
+
+
 def blur(path: str) -> float:
-    """Variance of the Laplacian on a 512 px greyscale copy. Low means blurry."""
+    """Sharpness 0..1 of the sharpest region of a 512 px greyscale copy; low means blurry. Per region, Crete et al.'s
+    re-blur measure: a sharp area loses much of its pixel-to-pixel variation when blurred again, a blurry one hardly
+    any, so plain areas are not called blurry. The worse axis counts, which catches motion blur. The sharpest region
+    counts, so a sharp subject on a soft background (depth of field) is sharp; shake leaves no region sharp."""
     img = Image.open(path).convert("L")
     img.thumbnail((512, 512))
     a = np.asarray(img, dtype=np.float32)
-    lap = a[1:-1, :-2] + a[1:-1, 2:] + a[:-2, 1:-1] + a[2:, 1:-1] - 4 * a[1:-1, 1:-1]
-    return float(lap.var())
+    total, kept = [], []  # per axis: pixel-to-pixel variation, and the part a re-blur removes
+    for axis in (0, 1):
+        f = np.abs(np.diff(a, axis=axis))
+        b = np.abs(np.diff(uniform_filter1d(a, 11, axis=axis), axis=axis))
+        total.append(f[8 : a.shape[0] - 9, 8 : a.shape[1] - 9])
+        kept.append(np.maximum(f - b, 0)[8 : a.shape[0] - 9, 8 : a.shape[1] - 9])
+    tiles = []  # (detail, sharpness) per region of a 4 x 4 grid
+    for rows in np.array_split(np.arange(total[0].shape[0]), 4):
+        for cols in np.array_split(np.arange(total[0].shape[1]), 4):
+            t = [x[np.ix_(rows, cols)].sum() for x in total]
+            k = [x[np.ix_(rows, cols)].sum() for x in kept]
+            tiles.append((sum(t), min(k[i] / t[i] if t[i] else 0.0 for i in (0, 1))))
+    # Near-empty regions (sky, walls) give a noisy score, so only regions with at least half the median detail count.
+    floor = 0.5 * float(np.median([d for d, _ in tiles]))
+    return float(max(s for d, s in tiles if d >= floor))
 
 
 def distance(a: np.ndarray, b: np.ndarray) -> float:

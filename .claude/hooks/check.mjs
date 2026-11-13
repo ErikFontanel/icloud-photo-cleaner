@@ -22,7 +22,7 @@ if (file.endsWith(".swift")) {
   const mac = resolve(root, "mac");
   run(".venv/bin/ruff", ["format", abs], mac);
   errors = run(".venv/bin/ruff", ["check", "--fix", "--output-format=concise", abs], mac);
-} else if (/^mac\/sift_mac\/web\/.*\.(js|css|html)$/.test(file)) {
+} else if (/^mac\/web\/.*\.(js|ts|tsx|css|html|json)$/.test(file)) {
   errors = run("./node_modules/.bin/biome", ["check", "--write", "--colors=off", abs]);
 } else if (file === "project.yml") {
   errors = run("scripts/generate.sh", []);

@@ -7,11 +7,12 @@ from collections import Counter
 import numpy as np
 from scipy.cluster.hierarchy import fcluster, leaves_list, linkage
 
+from .photos_app import TO_DELETE
 from .vision import CLASSES
 
 DOCUMENT_LABELS = ("Document", "Printed Page", "Handwriting", "Receipt", "Whiteboard", "Ticket", "Menu", "Paper")
 LOW_SCORE = -0.6
-BLURRY = 10.0
+BLURRY = 0.62  # sharpness; 2026-11-13 contact sheets: below it shake or motion blur, above it mostly sharp or depth of field
 MIN_CLASS_CONFIDENCE = 0.05  # below this a photo goes to "Other"
 SECTIONED = {"screenshots", "documents", "utility"}
 CLUSTER_SIZE = 15  # target average size of a "similar group" on the review page
@@ -71,15 +72,22 @@ def candidates(db: sqlite3.Connection) -> list[dict]:
     for key, label, where, order in GROUPS:
         params = DOCUMENT_LABELS if key == "documents" else ()
         rows = db.execute(
-            f"""select uuid, date, score, blur, classes from assets a
+            f"""select uuid, date, score, blur, classes, albums from assets a
                 where status = 'analysed' and favorite = 0 and (edited = 0 or screenshot = 1) and ({where})
                 and not exists (select 1 from decisions d where d.uuid = a.uuid and d.step = 'junk')
                 order by {order} asc""",
             params,
         ).fetchall()
         items = [
-            {"uuid": u, "date": d, "score": s, "blur": b, "section": section(c) if key in SECTIONED else None}
-            for u, d, s, b, c in rows
+            {
+                "uuid": u,
+                "date": d,
+                "score": s,
+                "blur": b,
+                "section": section(c) if key in SECTIONED else None,
+                "albums": [t for t in json.loads(a or "[]") if t != TO_DELETE],
+            }
+            for u, d, s, b, c, a in rows
             if u not in taken
         ]
         taken.update(i["uuid"] for i in items)
