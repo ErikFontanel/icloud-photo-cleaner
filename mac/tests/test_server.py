@@ -15,7 +15,7 @@ def base(fixture_dir):
     db = state.connect(config.state_db())
     db.execute(
         "insert into assets (uuid, status, date, score, utility, blur, screenshot, favorite, edited, labels, preview) "
-        "values ('u1', 'analysed', '2025-02-03T12:05:00+01:00', -0.8, 0, 0.9, 0, 0, 0, '[]', ?)",
+        "values ('u1', 'analysed', '2025-02-03T12:05:00+01:00', -0.8, 0, 0.05, 0, 0, 0, '[]', ?)",
         (str(fixture_dir / "blurry.jpg"),),
     )
     db.commit()

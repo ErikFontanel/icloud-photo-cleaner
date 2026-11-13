@@ -5,7 +5,7 @@ import pytest
 from sift_mac import apply, config, junk, state
 
 
-def add(db, uuid, score=0.3, utility=0, blur=50.0, screenshot=0, favorite=0, edited=0, labels=()):
+def add(db, uuid, score=0.3, utility=0, blur=0.9, screenshot=0, favorite=0, edited=0, labels=()):
     db.execute(
         "insert into assets (uuid, status, date, score, utility, blur, screenshot, favorite, edited, labels) values (?, 'analysed', '2024-06-14T10:00:00+01:00', ?, ?, ?, ?, ?, ?, ?)",
         (uuid, score, utility, blur, screenshot, favorite, edited, json.dumps(list(labels))),
@@ -25,8 +25,8 @@ def test_groups_and_order(db):
     add(db, "shot", screenshot=1, score=0.5)
     add(db, "doc", utility=1, labels=["Document"])
     add(db, "util-machine", utility=1, labels=["Machine"])  # utility without a document label
-    add(db, "blur-a", blur=3.0)
-    add(db, "blur-b", blur=1.0)
+    add(db, "blur-a", blur=0.3)
+    add(db, "blur-b", blur=0.1)
     add(db, "low", score=-0.9)
     add(db, "fine", score=-0.5)  # above the -0.6 cut-off
     g = groups(db)
@@ -34,14 +34,14 @@ def test_groups_and_order(db):
 
 
 def test_first_group_wins(db):
-    add(db, "both", screenshot=1, blur=1.0, score=-0.9)
+    add(db, "both", screenshot=1, blur=0.1, score=-0.9)
     g = groups(db)
     assert g["screenshots"] == ["both"] and g["blurry"] == [] and g["low"] == []
 
 
 def test_favourites_and_edited_never_suggested_but_edited_screenshots_are(db):
-    add(db, "fav", blur=1.0, favorite=1)
-    add(db, "edit", blur=1.0, edited=1)
+    add(db, "fav", blur=0.1, favorite=1)
+    add(db, "edit", blur=0.1, edited=1)
     add(db, "cropped-shot", screenshot=1, edited=1)
     add(db, "fav-shot", screenshot=1, edited=1, favorite=1)
     g = groups(db)
@@ -49,8 +49,8 @@ def test_favourites_and_edited_never_suggested_but_edited_screenshots_are(db):
 
 
 def test_decided_photos_leave_the_queue(db):
-    add(db, "a", blur=1.0)
-    add(db, "b", blur=2.0)
+    add(db, "a", blur=0.1)
+    add(db, "b", blur=0.2)
     apply.decide(db, "junk", "blurry", accept=["a"], reject=["b"])
     assert groups(db)["blurry"] == []
     assert apply.pending(db, "junk") == ["a"]
@@ -75,7 +75,7 @@ def test_similar_photos_sit_together(db):
     import numpy as np
 
     for u, fp in {"tv1": [0, 0], "rcpt1": [5, 5], "tv2": [0.1, 0], "rcpt2": [5, 5.1], "tv3": [0, 0.1]}.items():
-        add(db, u, blur=1.0)
+        add(db, u, blur=0.1)
         db.execute("update assets set fp=? where uuid=?", (np.asarray(fp, np.float32).tobytes(), u))
     order = groups(db)["blurry"]
     tv = [order.index(u) for u in ("tv1", "tv2", "tv3")]

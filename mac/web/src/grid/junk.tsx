@@ -174,7 +174,7 @@ export function Junk(props: StepProps) {
                 kept={kept}
                 dim={kept}
                 badge={kept ? "keep" : "junk"}
-                title={`${it.date.slice(0, 10)} · score ${it.score.toFixed(2)} · blur ${it.blur.toFixed(1)}`}
+                title={`${it.date.slice(0, 10)} · score ${it.score.toFixed(2)} · sharpness ${it.blur.toFixed(2)}`}
                 onToggle={() => {
                   const k = new Set(keep);
                   kept ? k.delete(it.uuid) : k.add(it.uuid);

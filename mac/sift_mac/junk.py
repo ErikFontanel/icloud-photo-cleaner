@@ -11,7 +11,7 @@ from .vision import CLASSES
 
 DOCUMENT_LABELS = ("Document", "Printed Page", "Handwriting", "Receipt", "Whiteboard", "Ticket", "Menu", "Paper")
 LOW_SCORE = -0.6
-BLURRY = 10.0
+BLURRY = 0.62  # sharpness; 2026-11-13 contact sheets: below it shake or motion blur, above it mostly sharp or depth of field
 MIN_CLASS_CONFIDENCE = 0.05  # below this a photo goes to "Other"
 SECTIONED = {"screenshots", "documents", "utility"}
 CLUSTER_SIZE = 15  # target average size of a "similar group" on the review page

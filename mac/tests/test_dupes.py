@@ -9,7 +9,7 @@ def db():
     return state.connect(config.state_db())
 
 
-def add(db, uuid, date, fp, favorite=0, edited=0, score=0.0, blur=50.0):
+def add(db, uuid, date, fp, favorite=0, edited=0, score=0.0, blur=0.9):
     db.execute(
         "insert into assets (uuid, status, date, fp, favorite, edited, score, blur) values (?, 'analysed', ?, ?, ?, ?, ?, ?)",
         (uuid, date, np.asarray(fp, np.float32).tobytes(), favorite, edited, score, blur),

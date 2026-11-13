@@ -108,6 +108,14 @@ def scan(photos, db: sqlite3.Connection, analyse=vision.analyse) -> dict[str, in
             ),
         )
         counts["analysed"] += 1
+    # A new blur measure makes the stored values incomparable, so every analysed photo is measured again, once.
+    if db.execute("select value from settings where key='blur_measure'").fetchone() != (vision.BLUR_MEASURE,):
+        old = [(u, p) for u, p in db.execute("select uuid, preview from assets where status='analysed'") if p and Path(p).exists()]
+        for n, (u, p) in enumerate(old, 1):
+            db.execute("update assets set blur=? where uuid=?", (vision.blur(p), u))
+            if n % 500 == 0 or n == len(old):
+                print(f"Re-measured blur {n:,}/{len(old):,}", flush=True)
+        db.execute("insert or replace into settings (key, value) values ('blur_measure', ?)", (vision.BLUR_MEASURE,))
     db.commit()
     if counts["errors"]:
         print(f"First analysis error: {first_error}")
