@@ -7,7 +7,8 @@
     current = null,
     data = null,
     tier = "near",
-    keep = new Map();
+    keep = new Map(),
+    labelling = false;
 
   function el(tag, attrs, text) {
     const e = document.createElement(tag);
@@ -54,20 +55,35 @@
       ...(state.done ? [el("button", { onclick: back }, "Undo last (Backspace)")] : []),
     );
   }
-  async function answer(same) {
-    if (current) showLabel(await call("/api/dupes/label", { a: current.a, b: current.b, same }));
+  // One labelling request at a time, so a fast double key press cannot label twice or out of order.
+  async function label(path, body) {
+    if (labelling) return;
+    labelling = true;
+    try {
+      const state = await call(path, body);
+      if (mode === "label") showLabel(state);
+    } catch (e) {
+      say(e.message, true);
+    } finally {
+      labelling = false;
+    }
   }
-  async function junkBoth() {
-    if (current) showLabel(await call("/api/dupes/junk", { a: current.a, b: current.b }));
+  function answer(same) {
+    if (current) label("/api/dupes/label", { a: current.a, b: current.b, same });
   }
-  async function back() {
-    showLabel(await call("/api/dupes/unlabel", {}));
+  function junkBoth() {
+    if (current) label("/api/dupes/junk", { a: current.a, b: current.b });
+  }
+  function back() {
+    label("/api/dupes/unlabel", {});
   }
 
   // ---- review ----
   async function loadSets() {
     say("Finding duplicate sets…");
-    data = await call("/api/dupes/sets");
+    const d = await call("/api/dupes/sets");
+    if (mode !== "review") return; // switched to labelling while loading
+    data = d;
     keep = new Map();
     renderSets();
   }
@@ -225,7 +241,11 @@
     $("modelabel").setAttribute("aria-pressed", String(m === "label"));
     $("modereview").setAttribute("aria-pressed", String(m === "review"));
     try {
-      m === "label" ? showLabel(await call("/api/dupes/label")) : await loadSets();
+      if (m === "review") await loadSets();
+      else {
+        const state = await call("/api/dupes/label");
+        if (mode === "label") showLabel(state);
+      }
     } catch (e) {
       say(e.message, true);
     }

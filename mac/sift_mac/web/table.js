@@ -1676,11 +1676,14 @@
       drawLasso();
     } else if (mode === "drag") {
       if (hotTray) {
-        const before = undoStack.pop(); // undo puts them back where the drag started
         hotTray.classList.remove("hot");
         hotTray = null;
-        mark(selected());
-        undoStack[undoStack.length - 1] = before;
+        const idx = selected();
+        if (idx.length) {
+          const before = undoStack.pop(); // undo puts them back where the drag started
+          mark(idx);
+          undoStack[undoStack.length - 1] = before;
+        }
       } else if (!moved && !(e.shiftKey || e.metaKey)) {
         const hit = pick(e.clientX, e.clientY);
         if (hit >= 0) {
@@ -1694,6 +1697,17 @@
     canvas.classList.remove("dragging", "panning");
     redraw();
     inspect();
+  });
+  canvas.addEventListener("pointercancel", () => {
+    // the system took the pointer (app switch, gesture): end without a drop, so the keys never stay blocked
+    if (mode === "erase") endStroke();
+    lasso = [];
+    drawLasso();
+    hotTray?.classList.remove("hot");
+    hotTray = null;
+    mode = null;
+    canvas.classList.remove("dragging", "panning");
+    redraw();
   });
   canvas.addEventListener("dblclick", (e) => {
     const h = pick(e.clientX, e.clientY);
@@ -1772,6 +1786,7 @@
       }
       return;
     }
+    if (mode) return; // no key changes selection, layout or undo during a pointer gesture
     const ql = !$("ql").hidden;
     if (ql) {
       if (e.key === "ArrowRight") {
@@ -1834,7 +1849,7 @@
     } else if (e.key === "?") $("help").hidden = !$("help").hidden;
   });
   addEventListener("keyup", (e) => {
-    if (e.key !== " ") return;
+    if (e.key !== " " || e.target.closest?.("input, textarea")) return; // a space typed in a field
     spaceDown = false;
     if (!spaceUsed && $("ql").hidden) {
       const s = selected();

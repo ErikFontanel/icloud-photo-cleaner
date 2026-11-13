@@ -938,6 +938,7 @@
     },
     true,
   );
+  document.addEventListener("keydown", () => (clicked = null), true); // a key-started edit has no button
   function busy() {
     const b = clicked,
       ev = b?.closest(".event");

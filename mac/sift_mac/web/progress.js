@@ -39,7 +39,12 @@ window.rescanButton = (done) => {
   text.className = "msg";
   wrap.append(b, " ", text);
   const poll = async () => {
-    const s = await (await fetch("/api/scan")).json();
+    let s;
+    try {
+      s = await (await fetch("/api/scan")).json();
+    } catch (e) {
+      s = { error: e.message };
+    }
     if (s.running) {
       text.textContent = "Scanning… new photos are analysed on this Mac; this can take a few minutes.";
       setTimeout(poll, 2000);
@@ -54,7 +59,8 @@ window.rescanButton = (done) => {
     b.disabled = true;
     b.classList.add("busy");
     try {
-      await fetch("/api/scan", { method: "POST", body: "{}" });
+      const r = await (await fetch("/api/scan", { method: "POST", body: "{}" })).json();
+      if (r.error) throw new Error(r.error); // refused: an apply or undo is running
       poll();
     } catch (e) {
       b.disabled = false;
