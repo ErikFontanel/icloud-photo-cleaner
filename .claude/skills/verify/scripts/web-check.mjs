@@ -77,6 +77,23 @@ check("Quick look shrinks back onto the table", qlShrink && qlShrink[0] > 0 && q
 await sleep(340);
 check("Space again closes quick look", await qlHidden());
 
+// 1b. Space to close, then Space again while it is still shrinking: the photo comes back whole, not stuck shrunk or
+// invisible (the closing flight's held end used to take over once the new one finished).
+await key(" ", "Space", " ");
+await sleep(500);
+await key(" ", "Space", " ");
+await sleep(80);
+await key(" ", "Space", " ");
+await sleep(700);
+const reopened = await js(`(() => { const i = document.querySelector("#ql img"), s = i && getComputedStyle(i); return !document.getElementById("ql").hidden && i && [s.opacity, s.transform, Math.round(i.getBoundingClientRect().width), i.offsetWidth]; })()`);
+check(
+  "Quick look reopened mid-close shows the whole photo",
+  reopened && reopened[0] === "1" && reopened[1] === "none" && reopened[2] === reopened[3],
+  `opacity, transform, width now, width at rest: ${reopened}`,
+);
+await key(" ", "Space", " ");
+await sleep(500);
+
 // 2. Typing a space in the tag field must not open quick look.
 const tagVisible = await js(`(() => { const t = document.getElementById("tagin"); return !!t && t.offsetParent !== null; })()`);
 await js(`document.getElementById("tagin").focus()`);
