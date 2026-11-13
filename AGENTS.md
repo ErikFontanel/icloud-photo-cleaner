@@ -8,6 +8,7 @@ Two apps that sort a photo library without deleting anything:
 ## Hard rules
 
 - **Sift never deletes photos.** Both apps add photos to the "Sift – To Delete" album; the user deletes them in Photos. `scripts/no-delete.sh` enforces this in the Xcode build, the commit hook and the edit hook. Deleting an album is fine.
+- **Never look at the user's photos.** Images you read go to the model provider's servers. Don't open, read or screenshot anything that shows the real library: Photos previews and originals, thumbnails, contact sheets or crops made from them, `/preview/` and `/thumb/` responses, or screenshots of the review page or table while it serves the real library (`~/.sift-mac`). Synthetic images are fine: `mac/tests/fixtures`, the "Sift Test" library and the simulator's sample photos. To tune a detector on real photos, work from numbers (scores, counts, labels the user gave) and ask the user to judge the photos; name the photos by UUID, date or score so they can look them up.
 - **Private values live in `.env`** (bundle ID prefix, team ID, home locations); `.env.example` lists every key. Code, tests and docs use neutral examples (Lyon, Lisbon, Kyoto, `com.example`). The pre-commit hook blocks any `.env` value.
 - **Edit `project.yml`, then run `scripts/generate.sh`.** `Sift.xcodeproj` is generated and not in git; plain `xcodegen generate` misses the `.env` values.
 - **Python runs through `uv`** (`uv run ...` in `mac/`).
