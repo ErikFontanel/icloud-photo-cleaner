@@ -1,11 +1,61 @@
 > [!NOTE]
-> run /setup to use
+> Tell your agent to run /setup to use
 
 # Sift
 
 Sift sorts your photo library one photo at a time. Swipe left to mark a photo for deletion, swipe right to keep it. Sift adds marked photos to the **Sift – To Delete** album in Photos. Sift never deletes photos: you delete them yourself from that album.
 
 Requirements: Xcode 26.1 or later, XcodeGen (`brew install xcodegen`), an iPhone with iOS 26. For development: pnpm and uv.
+
+## Getting started
+
+Run `/setup` in Claude Code, or run the setup script yourself:
+
+```sh
+.claude/skills/setup/scripts/setup.sh check   # one line per item: ok, todo or user (a step only you can do)
+.claude/skills/setup/scripts/setup.sh mac     # installs the Mac companion; the first run downloads several GB
+```
+
+Then set `SIFT_HOMES` in `.env` and give your terminal app Full Disk Access (**System Settings > Privacy & Security > Full Disk Access**), so it can read the Photos library.
+
+### Open the review page
+
+The Mac companion is a web page that runs on your Mac. Start it:
+
+```sh
+cd mac && uv run sift-mac review   # add --port 9000 to use another port
+```
+
+Then open <http://127.0.0.1:8765> in your browser. The server stops when you press Ctrl+C.
+
+- `/` is the grid: junk photos and duplicates, one step at a time. When a step is empty, click **Rescan for new photos** to analyse the photos added since the last scan.
+- `/table` is the photo table, where you sort photos into events and edit names, places, tags and albums.
+- **Apply to Photos** adds your decisions to the "Sift – To Delete" album. The first time, macOS asks to let your terminal control Photos. Click **OK**.
+
+### Change the review page
+
+To work on the page with hot reload, keep `sift-mac review` running and start Vite in a second terminal:
+
+```sh
+pnpm --dir mac/web dev   # proxies /api, /thumb and /preview to the running review server
+```
+
+`sift-mac review` serves the last build, so run `pnpm --dir mac/web build` before you use it without Vite.
+
+### CLI
+
+The page covers the daily work. The CLI (`cd mac`, then `uv run sift-mac <command>`) has the other steps:
+
+| Command | What it does |
+| --- | --- |
+| `scan` | Analyses photos added or changed since the last scan. Read-only. The page's Rescan button does the same. |
+| `events` | Finds events. The local model judges the events without GPS. |
+| `embed` | Groups undecided junk photos by content. |
+| `bench` | Scores the detectors against your labels. |
+| `evals` | Runs your searches (`~/.sift-mac/evals.toml`) through Photos' search. |
+| `setup` | Downloads the models and GeoNames data. The only step that uses the network. |
+
+If you move or rename the repo folder, run `setup.sh mac` again. It makes `mac/.venv` again, because a moved venv does not run.
 
 ## Build and test
 
