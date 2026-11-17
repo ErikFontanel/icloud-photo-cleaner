@@ -65,7 +65,7 @@ export function Events(props: StepProps) {
           .concat(r.piles)
           .sort(byTime),
       };
-      for (const m of ["tags", "albums", "album_adds", "album_removes"] as const) {
+      for (const m of ["tags", "people", "albums", "album_adds", "album_removes"] as const) {
         next[m] = { ...s[m] };
         for (const u of before) delete next[m][u];
         Object.assign(next[m], r[m]);

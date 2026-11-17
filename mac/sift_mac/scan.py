@@ -20,6 +20,10 @@ def camera(photo) -> str:
     return f"{e.camera_make or ''} {e.camera_model or ''}".strip() if e else ""
 
 
+def persons(photo) -> str:
+    return json.dumps([n for n in photo.persons if n != "_UNKNOWN_"])  # faces Photos found but nobody named
+
+
 def _modified(photo) -> str:
     return (photo.date_modified or photo.date).isoformat()
 
@@ -44,21 +48,24 @@ def scan(photos, db: sqlite3.Connection, analyse=vision.analyse) -> dict[str, in
         mod = _modified(p)
         if known.get(p.uuid, (None, "new"))[0] == mod and known[p.uuid][1] != "new":
             counts["unchanged"] += 1
-            # Keywords and albums change without a new modification date, so they are refreshed every scan.
-            db.execute("update assets set keywords=?, albums=? where uuid=?", (json.dumps(p.keywords), json.dumps(p.albums), p.uuid))
+            # Keywords, albums and people change without a new modification date, so they are refreshed every scan.
+            db.execute(
+                "update assets set keywords=?, albums=?, persons=? where uuid=?",
+                (json.dumps(p.keywords), json.dumps(p.albums), persons(p), p.uuid),
+            )
             if p.uuid in no_camera:
                 db.execute("update assets set camera=? where uuid=?", (camera(p), p.uuid))
             continue
         lat, lon = p.location
         preview = preview_path(p)
         db.execute(
-            """insert into assets (uuid, modified, status, date, lat, lon, favorite, edited, screenshot, labels, preview, pixels, burst_pick, camera, keywords, albums)
-               values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """insert into assets (uuid, modified, status, date, lat, lon, favorite, edited, screenshot, labels, preview, pixels, burst_pick, camera, keywords, albums, persons)
+               values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                on conflict(uuid) do update set modified=excluded.modified, status=excluded.status, date=excluded.date,
                lat=excluded.lat, lon=excluded.lon, favorite=excluded.favorite, edited=excluded.edited,
                screenshot=excluded.screenshot, labels=excluded.labels, preview=excluded.preview,
                pixels=excluded.pixels, burst_pick=excluded.burst_pick, camera=excluded.camera,
-               keywords=excluded.keywords, albums=excluded.albums""",
+               keywords=excluded.keywords, albums=excluded.albums, persons=excluded.persons""",
             (
                 p.uuid,
                 mod,
@@ -76,6 +83,7 @@ def scan(photos, db: sqlite3.Connection, analyse=vision.analyse) -> dict[str, in
                 camera(p),
                 json.dumps(p.keywords),
                 json.dumps(p.albums),
+                persons(p),
             ),
         )
         if preview:

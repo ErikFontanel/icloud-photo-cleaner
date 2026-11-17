@@ -119,6 +119,7 @@ def state(db: sqlite3.Connection) -> dict:
         "pile_of": dict(db.execute("select uuid, pile from pile_of")),
         "names": names,
         "tags": tags,
+        "people": {u: json.loads(p) for u, p in db.execute("select uuid, persons from assets") if p and p != "[]"},  # read-only
         "tag_index": sorted({w for words in tags.values() for w in words}, key=str.lower),
         "albums": albums,
         "album_adds": adds,
@@ -189,7 +190,7 @@ def piles_update(db: sqlite3.Connection, keys: list[str]) -> dict:
     return {
         "piles": ps,
         "gone": sorted(set(keys) - {p["key"] for p in ps}),
-        **{k: pick(st[k]) for k in ("tags", "albums", "album_adds", "album_removes")},
+        **{k: pick(st[k]) for k in ("tags", "people", "albums", "album_adds", "album_removes")},
         **{k: st[k] for k in ("names", "kept", "fav_edits", "undo", "pending", "tag_index", "album_index")},
     }
 

@@ -25,6 +25,7 @@ export type EditState = {
   pile_of: Record<string, string>;
   names: Record<string, string>;
   tags: ByPhoto;
+  people: ByPhoto; // named in Photos; read-only, Photos has no API to add people
   albums: ByPhoto;
   album_adds: ByPhoto;
   album_removes: ByPhoto;

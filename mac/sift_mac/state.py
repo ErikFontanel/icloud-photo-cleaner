@@ -28,7 +28,8 @@ create table if not exists assets (
     burst_pick integer,                   -- 2 picked by you in Photos, 1 Photos' own key photo, 0 otherwise
     camera text,                          -- EXIF make + model; '' when the photo has none
     keywords text,                        -- JSON list of the photo's Photos keywords at the last scan
-    albums text                           -- JSON list of the titles of the albums it is in at the last scan
+    albums text,                          -- JSON list of the titles of the albums it is in at the last scan
+    persons text                          -- JSON list of the people Photos named in it at the last scan
 );
 create table if not exists decisions (
     uuid text not null,
@@ -139,6 +140,7 @@ def connect(path: Path) -> sqlite3.Connection:
         ("camera", "text"),
         ("keywords", "text"),
         ("albums", "text"),
+        ("persons", "text"),
     ):  # state from before these columns existed
         if col not in cols:
             db.execute(f"alter table assets add column {col} {kind}")

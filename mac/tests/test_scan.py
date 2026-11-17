@@ -35,6 +35,7 @@ def fake(uuid, preview, modified=datetime(2025, 1, 1, tzinfo=UTC)):
         exif_info=SimpleNamespace(camera_make="Canon", camera_model="Canon PowerShot G9 X"),
         keywords=[],
         albums=[],
+        persons=[],
     )
 
 
@@ -147,6 +148,16 @@ def test_camera_is_stored_and_backfilled(db, fixture_dir):
     db.execute("update assets set camera=null")  # a row from before the camera column
     counts = scan([fake("a", fixture_dir / "event_0.jpg")], db)
     assert counts["unchanged"] == 1 and db.execute("select camera from assets").fetchone() == ("Canon Canon PowerShot G9 X",)
+
+
+def test_named_people_are_stored_and_refreshed(db, fixture_dir):
+    photo = fake("a", fixture_dir / "event_0.jpg")
+    photo.persons = ["Ana", "_UNKNOWN_"]  # a face Photos found but nobody named
+    scan([photo], db)
+    assert db.execute("select persons from assets").fetchone() == ('["Ana"]',)
+    photo.persons = ["Ana", "Ben"]  # named in Photos since: no new modification date
+    counts = scan([photo], db)
+    assert counts["unchanged"] == 1 and db.execute("select persons from assets").fetchone() == ('["Ana", "Ben"]',)
 
 
 def test_a_skipped_photo_is_analysed_once_its_preview_is_local(db, fixture_dir):

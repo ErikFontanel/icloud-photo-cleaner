@@ -454,3 +454,9 @@ def test_deciding_again_on_an_applied_photo_keeps_its_run(db):
     assert apply.pending(db, "junk") == [] and apply.apply_junk(db, app)["run"] is None
     apply.undo(db, run, app)
     assert app.album_members() == set() and db.execute("select count(*) from decisions").fetchone() == (0,)
+
+
+def test_state_lists_the_people_named_in_photos(db):
+    db.execute("""update assets set persons='["Ana"]' where uuid='a1'""")
+    db.execute("update assets set persons='[]' where uuid='a2'")
+    assert edits.state(db)["people"] == {"a1": ["Ana"]}

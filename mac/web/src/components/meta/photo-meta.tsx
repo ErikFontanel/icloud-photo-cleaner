@@ -3,6 +3,7 @@ import { AlbumsField } from "@/components/meta/albums-field";
 import { type SetPlace, SpotRow } from "@/components/meta/spot-row";
 import { SubmitField } from "@/components/meta/submit-field";
 import { TagsField } from "@/components/meta/tags-field";
+import { Badge } from "@/components/ui/badge";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Spinner } from "@/components/ui/spinner";
 import { albumsOf } from "@/lib/albums";
@@ -10,7 +11,7 @@ import type { EditState, Spot } from "@/lib/api";
 import { counts, placeText, plural } from "@/lib/format";
 
 export type Edit = (path: string, body: object) => Promise<unknown>;
-export type MetaState = Pick<EditState, "names" | "tags" | "albums" | "album_adds" | "album_removes" | "tag_index" | "album_index">;
+export type MetaState = Pick<EditState, "names" | "tags" | "people" | "albums" | "album_adds" | "album_removes" | "tag_index" | "album_index">;
 
 type Props = {
   uuids: string[]; // the photos these fields change
@@ -35,7 +36,7 @@ export const placeSetter =
     else if (!city) toast(`Place cleared for ${plural(us.length, "photo")}.`);
   };
 
-// Place, tags and albums of one or more photos: the same fields in an event row, the large photo and the table.
+// Place, tags, people and albums of one or more photos: the same fields in an event row, the large photo and the table.
 export function PhotoMeta({ uuids, st, edit, eventName, withEventAlbum, spots, listSpots = true, ids = {}, blurOnSubmit }: Props) {
   const n = uuids.length;
   const setPlace = placeSetter(edit, spots);
@@ -45,6 +46,7 @@ export function PhotoMeta({ uuids, st, edit, eventName, withEventAlbum, spots, l
   const current = texts.size === 1 ? [...texts][0] : "";
   // Photos with a location of their own (GPS, or a pin an earlier Apply wrote) never get another: nothing to set.
   const allGps = !!spots && spots.length === 0;
+  const people = counts(uuids, st.people);
   return (
     <FieldGroup className="gap-4">
       <Field className="gap-2">
@@ -81,6 +83,23 @@ export function PhotoMeta({ uuids, st, edit, eventName, withEventAlbum, spots, l
           onEdit={(add, remove) => edit("/api/table/tags", { uuids, add, remove })}
         />
       </Field>
+      {people.length > 0 && ( // read-only: Photos has no API to add people
+        <Field className="gap-2">
+          <FieldLabel>People</FieldLabel>
+          <div className="flex flex-wrap gap-1">
+            {people.map(([name, k]) => (
+              <Badge key={name} variant="secondary">
+                {name}
+                {k !== n && (
+                  <span className="text-muted-foreground">
+                    · {k} of {n}
+                  </span>
+                )}
+              </Badge>
+            ))}
+          </div>
+        </Field>
+      )}
       <Field className="gap-2">
         <FieldLabel htmlFor={ids.album}>Albums</FieldLabel>
         <AlbumsField

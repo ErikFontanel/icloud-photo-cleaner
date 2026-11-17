@@ -1269,6 +1269,7 @@ export function startTable(hud) {
       pile_of: {},
       names: {},
       tags,
+      people: Object.fromEntries(uuid.filter((_, i) => i % 5 === 0).map((u) => [u, ["Ana"]])),
       albums: {},
       album_adds: adds,
       album_removes: {},
