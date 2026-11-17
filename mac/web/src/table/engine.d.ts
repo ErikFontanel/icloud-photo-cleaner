@@ -10,6 +10,7 @@ export type Engine = {
   hideAlbums: () => void;
   restoreTray: () => void;
   closeQL: () => void;
+  viewEvent: () => void;
   apply: () => Promise<string>;
   undoApply: () => Promise<void>;
   takeState: (s: EditState) => void;

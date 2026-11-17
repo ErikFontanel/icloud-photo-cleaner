@@ -1193,6 +1193,15 @@ export function startTable(hud) {
     qlAt = qlList.indexOf(i);
     showQL();
   }
+  function viewEvent() {
+    // the large photo on the selected event's photos, by time, from the first selected one
+    const g = hud.get().selection?.g;
+    if (g === undefined) return;
+    const s = selected();
+    qlList = (members().get(g) || []).sort((a, b) => tsec[a] - tsec[b]);
+    qlAt = Math.max(0, qlList.indexOf(s.find((i) => grp[i] === g)));
+    showQL();
+  }
   function showQL() {
     if (!qlList.length) return closeQL();
     qlAt = Math.max(0, Math.min(qlAt, qlList.length - 1));
@@ -1791,6 +1800,7 @@ export function startTable(hud) {
     hideAlbums: () => setHideAlbums(!hideAlbums),
     restoreTray,
     closeQL,
+    viewEvent,
     apply,
     undoApply,
     takeState,

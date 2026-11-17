@@ -189,7 +189,20 @@ function Inspector({ engine, hud, sel }: { engine: Engine; hud: Hud; sel: Select
         <div className="grid gap-1">
           <EventTitle name={sel.name} label={sel.label} />
           <div className="text-xs text-muted-foreground">
-            {sel.events > 1 ? `${sel.events} events selected · M merges them` : `${sel.pileUuids.length} photos in this event`}
+            {sel.events > 1 ? (
+              `${sel.events} events selected · M merges them`
+            ) : (
+              <button
+                type="button"
+                className="underline-offset-2 hover:text-foreground hover:underline"
+                onClick={(e) => {
+                  e.currentTarget.blur(); // Space closes the large photo; it must not press this again
+                  engine.viewEvent();
+                }}
+              >
+                {sel.pileUuids.length} photos in this event
+              </button>
+            )}
           </div>
         </div>
         <EventName id="evname" name={sel.name} label={sel.label} onSave={engine.setName} blurOnSubmit />

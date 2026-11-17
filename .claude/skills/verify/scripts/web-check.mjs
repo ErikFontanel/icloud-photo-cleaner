@@ -155,6 +155,21 @@ await click('[aria-label="Remove tag checktag"]');
 await sleep(700);
 check("The tag chip's × removes it", !(await tagged("checktag")));
 
+// 4b. One photo selected: "N photos in this event" opens the large photo on all N, from the clicked one.
+await key("f", "KeyF", "f"); // fit: a 2024 photo sits at (720, 190)
+await sleep(700);
+await send("Input.dispatchMouseEvent", { type: "mousePressed", x: 720, y: 190, button: "left", clickCount: 1 });
+await send("Input.dispatchMouseEvent", { type: "mouseReleased", x: 720, y: 190, button: "left", clickCount: 1 });
+await sleep(400);
+const inEvent = await js(`(() => { const b = [...document.querySelectorAll("button")].find((b) => /photos in this event/.test(b.textContent)); return b ? parseInt(b.textContent) : 0; })()`);
+await js(`[...document.querySelectorAll("button")].find((b) => /photos in this event/.test(b.textContent))?.click()`);
+await sleep(600);
+const caption = await js(`document.getElementById("ql").hidden ? "" : document.getElementById("ql").innerText`);
+check("'N photos in this event' opens the large photo on the whole event", inEvent > 1 && caption.includes(`of ${inEvent} ·`), `N=${inEvent}, caption: ${caption.split("·").slice(1, 2)}`);
+await shot("web-view-event.png");
+await key("Escape", "Escape", "");
+await sleep(500);
+
 // 5. Grid, Events step: the album field adds the event's photos to an album; the event name field names it.
 await send("Page.navigate", { url: BASE + "/#events" });
 for (let i = 0; i < 30 && !(await js(`/Event name/.test(document.body.innerText)`)); i++) await sleep(300);
