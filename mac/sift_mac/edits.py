@@ -503,7 +503,8 @@ def apple_maps(text: str, cc: str = "") -> dict | None:
         found = in_country(search(words)) or found  # "Autodromo Monza IT" answered with just Monza
     if not found:
         return None
-    r = found[0]
+    # The place named exactly as typed beats Apple's first answer, which can be a business named after it
+    r = next((r for r in found if events.fold(r["name"]) == events.fold(words)), found[0])
     label = r["name"] if not r["locality"] or events.fold(r["locality"]) in events.fold(r["name"]) else f"{r['name']}, {r['locality']}"
     return {"city": label, "country": r["country"], "lat": r["lat"], "lon": r["lon"]}
 
