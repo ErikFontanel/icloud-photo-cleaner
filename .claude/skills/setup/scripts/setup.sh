@@ -16,6 +16,8 @@ todo() { print -r -- "todo  $1"; missing=1; }
 user() { print -r -- "user  $1"; missing=1; }
 has() { command -v "$1" >/dev/null; }
 python_ok() { for p in python3 python3.{12..15}; do has $p && $p -c 'import sys; sys.exit(sys.version_info < (3, 12))' 2>/dev/null && return; done; return 1; }
+# A venv moved with the repo keeps the old path in its shebangs and editable install, so run it, don't just look for it.
+venv_ok() { mac/.venv/bin/sift-mac --help >/dev/null 2>&1; }
 xcode_ok() { [[ $(xcode-select -p 2>/dev/null) == *Xcode*.app/* ]]; }
 sim_udid() { xcrun simctl list devices available | grep -m1 "    $DEVICE (" | sed -E 's/.*\(([0-9A-F-]{36})\).*/\1/'; }
 
@@ -29,10 +31,12 @@ check_mac() {
   else ok ".env"; fi
   [[ -d node_modules ]] && ok "pnpm packages and git hooks" || todo "pnpm packages and git hooks (pnpm install)"
   [[ -f mac/sift_mac/web/index.html ]] && ok "review page build" || todo "review page build (pnpm --dir mac/web build)"
-  [[ -x mac/.venv/bin/sift-mac ]] && ok "Python packages" || todo "Python packages (uv sync --all-groups in mac/)"
+  if venv_ok; then ok "Python packages"
+  elif [[ -d mac/.venv ]]; then todo "Python packages: mac/.venv does not run (moved repo?), setup.sh mac makes it again"
+  else todo "Python packages (uv sync --all-groups in mac/)"; fi
   [[ -x $HELPERS[1] && -x $HELPERS[2] ]] && ok "Swift helpers" || todo "Swift helpers (swift build in mac/helper)"
   [[ -f ${SIFT_HOME:-$HOME/.sift-mac}/geonames/cities1000.txt ]] && ok "GeoNames data" || todo "GeoNames data (sift-mac setup)"
-  if [[ -x mac/.venv/bin/python ]]; then
+  if venv_ok; then
     local hf=${HF_HUB_CACHE:-${HF_HOME:-$HOME/.cache/huggingface}/hub} m
     for m in $(mac/.venv/bin/python -c 'from sift_mac.setup import OLLAMA_MODELS as o, HF_MODELS as h; print(*o, *h)'); do
       if [[ $m == */* ]]; then [[ -d $hf/models--${m//\//--} ]]
@@ -71,6 +75,7 @@ install_mac() {
   [[ -f .env ]] || cp .env.example .env
   pnpm install
   pnpm --dir mac/web build
+  [[ -d mac/.venv ]] && ! venv_ok && rm -rf mac/.venv
   (cd mac && uv sync --all-groups)
   swift build -c release --package-path mac/helper
   (cd mac && uv run sift-mac setup)
