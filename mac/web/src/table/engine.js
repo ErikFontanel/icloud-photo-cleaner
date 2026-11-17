@@ -30,6 +30,7 @@ export function startTable(hud) {
     looks_ = [],
     tsec,
     cl,
+    dist, // feature print distance to the photo's look cluster centre
     grp,
     gord,
     hw,
@@ -55,6 +56,7 @@ export function startTable(hud) {
     N = n;
     tsec = new Float64Array(n);
     cl = new Int32Array(n);
+    dist = new Float32Array(n);
     grp = new Int32Array(n);
     gord = new Int32Array(n);
     hw = new Float32Array(n);
@@ -776,7 +778,8 @@ export function startTable(hud) {
         cy = 0,
         rowH = 0;
       for (const c of [...looks.keys()].sort((a, b) => a - b)) {
-        const g = looks.get(c).sort((a, b) => tsec[a] - tsec[b]),
+        const odd = looks_[c] === "Odd ones" || !looks_[c],
+          g = looks.get(c).sort((a, b) => (odd ? dist[a] - dist[b] : tsec[a] - tsec[b])), // odd ones: closest matches first
           cols = Math.ceil(Math.sqrt(g.length * 1.4));
         const w = cols * CELL,
           h = Math.ceil(g.length / cols) * CELL;
@@ -786,7 +789,7 @@ export function startTable(hud) {
           rowH = 0;
         }
         g.forEach((i, k) => pos.set(i, [cx + (k % cols) * CELL, cy + Math.floor(k / cols) * CELL, 0]));
-        labels.push({ x: cx - 0.5, y: cy - 0.65, text: looks_[c] || "Mixed", min: 7 });
+        labels.push({ x: cx - 0.5, y: cy - 0.65, text: looks_[c] || "Odd ones", min: 7 });
         cx += w + 1.6;
         rowH = Math.max(rowH, h);
       }
@@ -1758,6 +1761,7 @@ export function startTable(hud) {
         uuid[i] = p.u;
         tsec[i] = p.t;
         cl[i] = p.c;
+        dist[i] = p.d ?? 0;
         grp[i] = p.g;
         gord[i] = p.o;
         fav[i] = p.f;

@@ -23,7 +23,19 @@ def test_look_names_pick_the_typical_label():
     names = look_names(db, photos)
     assert names[0] == "Cat · Window"  # not Mammal or Whiskers; Window is unrelated and strong
     assert names[1] == "Sunset"  # Sky is everywhere, so it says nothing about this cluster
-    assert names[3] == "Mixed"  # no labels at all
+    assert names[3] == "Odd ones"  # no labels at all
+
+
+def test_clusters_with_the_same_name_get_what_sets_them_apart():
+    db = sqlite3.connect(":memory:")
+    db.execute("create table assets (uuid text, labels text)")
+    extra = {0: "Sofa", 1: "Grass"}  # too rare to name a cluster on their own; cluster 2 has nothing of its own
+    rows = [(f"{c}-{i}", ["Cat"] + ([extra[c]] if c in extra and i < 2 else [])) for c in range(3) for i in range(10)]
+    rows += [(f"{c}-{i}", ["Sky"] + (["Sofa", "Grass"] if c == 3 and i < 2 else [])) for c in range(3, 6) for i in range(10)]
+    # Sofa and Grass outside cats too: a label nearly always on a cat (a breed) never sets a Cat cluster apart
+    db.executemany("insert into assets values (?, ?)", [(u, json.dumps(ls)) for u, ls in rows])
+    names = look_names(db, [{"u": u, "c": int(u.split("-")[0])} for u, _ in rows])
+    assert names[:3] == ["Cat · Sofa", "Cat · Grass", "Cat"]
 
 
 def test_a_small_library_is_one_cluster():
@@ -109,3 +121,14 @@ def test_a_stale_table_build_never_overwrites_a_newer_one(builds, monkeypatch):
     gate.set()
     m = built(db, started)
     assert {p["u"] for p in m["photos"]} == {"p1", "p2"}
+
+
+def test_distances_rank_a_cluster_from_its_centre_out():
+    db = sqlite3.connect(":memory:")
+    db.execute("create table assets (uuid text, fp blob)")
+    fps = {"near": [1.0, 0.0], "mid": [2.0, 0.0], "far": [6.0, 0.0], "other": [0.0, 9.0]}  # centre of cluster 0: x=3
+    db.executemany("insert into assets values (?, ?)", [(u, np.array(v, np.float32).tobytes()) for u, v in fps.items()])
+    photos = [{"u": u, "c": int(u == "other")} for u in fps]
+    table.add_distances(db, photos)
+    d = {p["u"]: p["d"] for p in photos}
+    assert d["mid"] < d["near"] < d["far"] and d["other"] == 0  # alone in its cluster: it is the centre

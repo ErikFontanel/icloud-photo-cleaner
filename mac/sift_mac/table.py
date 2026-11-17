@@ -72,6 +72,7 @@ def _clusters(X: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     return rank[label], np.bincount(rank[label], minlength=k)
 
 
+ODD = "Odd ones"  # a cluster no label fits: mostly photos that look like nothing else in the library
 BROAD = {"Animal", "Mammal", "Feline", "Felinae", "Whiskers", "Canine", "Line", "Road Other"}  # Cat and Dog say it better
 
 
@@ -87,7 +88,7 @@ def look_names(db: sqlite3.Connection, photos: list[dict]) -> list[str]:
             has.setdefault(lb, set()).add(p["u"])
     n = len(photos)
     implies = lambda a, b: len(has[a] & has[b]) > 0.85 * len(has[a])  # a photo labelled a is almost always labelled b
-    names = ["Mixed"] * (max(by, default=-1) + 1)
+    names = [ODD] * (max(by, default=-1) + 1)
     for c, us in by.items():
         share = {lb: k / len(us) for lb, k in Counter(lb for u in us for lb in labels.get(u, ())).items()}
         share = {lb: s for lb, s in share.items() if s >= 0.25 and s * n / len(has[lb]) > 1.5 and lb not in BROAD}
@@ -97,7 +98,43 @@ def look_names(db: sqlite3.Connection, photos: list[dict]) -> list[str]:
         a = max(share, key=score)
         rest = [b for b in share if b != a and not implies(a, b) and not implies(b, a) and share[b] >= 0.3]
         names[c] = a + (f" · {max(rest, key=score)}" if rest else "")
+    # Clusters that got the same name: add the label that sets each apart from the others of that name (Cat · Sofa).
+    for name in {x for x in names if x != ODD and names.count(x) > 1}:
+        same = [c for c in by if names[c] == name]
+        parts = name.split(" · ")
+        for c in same:
+            others = [u for o in same if o != c for u in by[o]]
+            here = Counter(lb for u in by[c] for lb in labels.get(u, ()))
+            there = Counter(lb for u in others for lb in labels.get(u, ()))
+            gap = {
+                lb: k / len(by[c]) - there[lb] / len(others)
+                for lb, k in here.items()
+                if k >= 0.08 * len(by[c])
+                and lb not in BROAD
+                and lb not in parts
+                and not any(implies(lb, p) or implies(p, lb) for p in parts)
+            }
+            for lb in sorted(gap, key=gap.get, reverse=True):
+                new = f"{parts[0]} · {lb}"  # the head label stays; the tie-breaker replaces a shared second one
+                if gap[lb] < 0.05:
+                    break  # nothing sets it apart: it keeps the shared name
+                if new not in names:
+                    names[c] = new
+                    break
     return names
+
+
+def add_distances(db: sqlite3.Connection, photos: list[dict]) -> None:
+    """Each photo's feature print distance to its cluster's centre ("d"), so an Odd ones cluster lists its closest matches first."""
+    fp = dict(db.execute("select uuid, fp from assets where fp is not null"))
+    by: dict[int, list[dict]] = {}
+    for p in photos:
+        if p["u"] in fp:
+            by.setdefault(p["c"], []).append(p)
+    for ps in by.values():
+        X = np.stack([np.frombuffer(fp[p["u"]], np.float32) for p in ps])
+        for p, d in zip(ps, np.linalg.norm(X - X.mean(axis=0), axis=1), strict=True):
+            p["d"] = round(float(d), 3)
 
 
 def _visual_order(X: np.ndarray) -> np.ndarray:
@@ -199,6 +236,7 @@ def manifest(db: sqlite3.Connection) -> dict:
                 threading.Thread(target=_build, args=(_photos(db), key, config.state_db(), _state["build"]), daemon=True).start()
         if _state["manifest"] and "looks" not in _state["manifest"]:  # named on load: labels can change without a rebuild
             _state["manifest"]["looks"] = look_names(db, _state["manifest"]["photos"])
+            add_distances(db, _state["manifest"]["photos"])
         error = _state["error"]
         if error:  # reported once; the next request builds again
             _state.update(key=None, error=None)
